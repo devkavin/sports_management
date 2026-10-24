@@ -55,3 +55,8 @@ Desktop.ini
 *.tmp
 *.temp
 
+# Private database exports
+backups/
+*.sql
+*.sql.gz
+

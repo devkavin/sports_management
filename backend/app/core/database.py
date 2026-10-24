@@ -14,6 +14,7 @@ engine = create_engine(
     db_url,
     pool_pre_ping=True,
     pool_recycle=3600,
+    isolation_level="READ COMMITTED",
     connect_args={"connect_timeout": 5},
 )
 
@@ -21,12 +22,23 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def run_additive_migrations():
-    """Ensure newly added columns exist in SQLite/MySQL without data loss"""
+    """Ensure legacy MySQL columns exist without data loss; fail the migration on errors"""
     from sqlalchemy import inspect, text
     inspector = inspect(engine)
     tables = inspector.get_table_names()
 
     with engine.connect() as conn:
+        if "boathouse_conditions" in tables:
+            columns = [c["name"] for c in inspector.get_columns("boathouse_conditions")]
+            # Old releases generated reports automatically. Retain those rows,
+            # but never display them as trusted observations until republished.
+            if "report_source" not in columns:
+                conn.execute(text("ALTER TABLE boathouse_conditions ADD COLUMN report_source VARCHAR(32) NOT NULL DEFAULT 'legacy_unverified'"))
+                conn.commit()
+            if "valid_until" not in columns:
+                conn.execute(text("ALTER TABLE boathouse_conditions ADD COLUMN valid_until DATETIME NULL"))
+                conn.commit()
+
         if "clubs" in tables:
             columns = [c["name"] for c in inspector.get_columns("clubs")]
             for column_name in ["benchmark_2k_split_seconds", "gold_2k_split_seconds"]:
@@ -35,13 +47,15 @@ def run_additive_migrations():
                         conn.execute(text(f"ALTER TABLE clubs ADD COLUMN {column_name} FLOAT"))
                         conn.commit()
                     except Exception as e:
-                        logger.debug("Column %s already present or error: %s", column_name, e)
+                        logger.error("Column %s already present or error: %s", column_name, e)
+                        raise
             if "athlete_join_policy" not in columns:
                 try:
                     conn.execute(text("ALTER TABLE clubs ADD COLUMN athlete_join_policy VARCHAR(32) NOT NULL DEFAULT 'approval_required'"))
                     conn.commit()
                 except Exception as e:
-                    logger.debug("Column athlete_join_policy already present or error: %s", e)
+                    logger.error("Column athlete_join_policy already present or error: %s", e)
+                    raise
 
         for table_name in ["equipment", "exercises"]:
             if table_name in tables:
@@ -51,7 +65,8 @@ def run_additive_migrations():
                         conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
                         conn.commit()
                     except Exception as e:
-                        logger.debug("Column is_active on %s already present or error: %s", table_name, e)
+                        logger.error("Column is_active on %s already present or error: %s", table_name, e)
+                        raise
 
         # Check schedules table
         if "schedules" in tables:
@@ -61,19 +76,22 @@ def run_additive_migrations():
                     conn.execute(text("ALTER TABLE schedules ADD COLUMN taxonomy_node_id INTEGER"))
                     conn.commit()
                 except Exception as e:
-                    logger.debug("Column taxonomy_node_id already present or error: %s", e)
+                    logger.error("Column taxonomy_node_id already present or error: %s", e)
+                    raise
             if "taxonomy_path_snapshot" not in columns:
                 try:
                     conn.execute(text("ALTER TABLE schedules ADD COLUMN taxonomy_path_snapshot VARCHAR(512)"))
                     conn.commit()
                 except Exception as e:
-                    logger.debug("Column taxonomy_path_snapshot already present or error: %s", e)
+                    logger.error("Column taxonomy_path_snapshot already present or error: %s", e)
+                    raise
             if "taxonomy_node_name" not in columns:
                 try:
                     conn.execute(text("ALTER TABLE schedules ADD COLUMN taxonomy_node_name VARCHAR(255)"))
                     conn.commit()
                 except Exception as e:
-                    logger.debug("Column taxonomy_node_name already present or error: %s", e)
+                    logger.error("Column taxonomy_node_name already present or error: %s", e)
+                    raise
 
         # Check training_sessions table
         if "training_sessions" in tables:
@@ -83,19 +101,22 @@ def run_additive_migrations():
                     conn.execute(text("ALTER TABLE training_sessions ADD COLUMN duration_minutes INTEGER NOT NULL DEFAULT 60"))
                     conn.commit()
                 except Exception as e:
-                    logger.debug("Column duration_minutes already present or error: %s", e)
+                    logger.error("Column duration_minutes already present or error: %s", e)
+                    raise
             if "taxonomy_node_id" not in columns:
                 try:
                     conn.execute(text("ALTER TABLE training_sessions ADD COLUMN taxonomy_node_id INTEGER"))
                     conn.commit()
                 except Exception as e:
-                    logger.debug("Column taxonomy_node_id already present or error: %s", e)
+                    logger.error("Column taxonomy_node_id already present or error: %s", e)
+                    raise
             if "taxonomy_path_snapshot" not in columns:
                 try:
                     conn.execute(text("ALTER TABLE training_sessions ADD COLUMN taxonomy_path_snapshot VARCHAR(512)"))
                     conn.commit()
                 except Exception as e:
-                    logger.debug("Column taxonomy_path_snapshot already present or error: %s", e)
+                    logger.error("Column taxonomy_path_snapshot already present or error: %s", e)
+                    raise
 
             # Older demo schedules embedded the weekday in the title. The date is
             # authoritative; keep the title reusable and derive day_of_week from it.
@@ -111,7 +132,8 @@ def run_additive_migrations():
                         conn.execute(text("UPDATE training_sessions SET title = :title, day_of_week = :day WHERE id = :id"), {"title": clean_title, "day": parsed_date.weekday(), "id": row["id"]})
                 conn.commit()
             except Exception as e:
-                logger.debug("Session title/day normalization skipped: %s", e)
+                logger.error("Session title/day normalization skipped: %s", e)
+                raise
 
         # Structured prescription targets make planned-vs-actual analytics
         # possible while retaining the legacy display-text columns.
@@ -133,7 +155,8 @@ def run_additive_migrations():
                         conn.execute(text(f"ALTER TABLE session_exercises ADD COLUMN {column_name} {column_type}"))
                         conn.commit()
                     except Exception as e:
-                        logger.debug("Column %s already present or error: %s", column_name, e)
+                        logger.error("Column %s already present or error: %s", column_name, e)
+                        raise
 
         if "performance_entries" in tables:
             columns = [c["name"] for c in inspector.get_columns("performance_entries")]
@@ -144,7 +167,8 @@ def run_additive_migrations():
                         conn.execute(text(f"ALTER TABLE performance_entries ADD COLUMN {column_name} {column_type}"))
                         conn.commit()
                     except Exception as e:
-                        logger.debug("Column %s already present or error: %s", column_name, e)
+                        logger.error("Column %s already present or error: %s", column_name, e)
+                        raise
 
 def get_db():
     db = SessionLocal()

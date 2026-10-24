@@ -11,6 +11,16 @@ services:
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set}
       - CORS_ORIGINS=${CORS_ORIGINS:?CORS_ORIGINS must be set}
       - ACCESS_TOKEN_EXPIRE_MINUTES=10080
+      - PUBLIC_APP_URL=${PUBLIC_APP_URL:-http://localhost:3000}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-true}
+      - SMTP_SSL=${SMTP_SSL:-false}
+      - EMAIL_WORKER_ENABLED=${EMAIL_WORKER_ENABLED:-true}
+      - REMINDER_HOURS=${REMINDER_HOURS:-24}
     ports:
       - "8000:8000"
 
