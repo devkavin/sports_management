@@ -1,3 +1,4 @@
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../services/api';
 import { TaxonomyNode } from '../../types';
@@ -21,6 +22,7 @@ export const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
   placeholder = 'Select training taxonomy phase / branch...',
   allowQuickCreate = true
 }) => {
+  const { notify, confirm } = useFeedback();
   const [nodes, setNodes] = useState<TaxonomyNode[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -87,7 +89,7 @@ export const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
       setShowQuickCreate(false);
       setQuickName('');
     } catch (err: any) {
-      alert(`Error creating taxonomy node: ${err.message}`);
+      notify(`Error creating taxonomy node: ${err.message}`);
     } finally {
       setCreating(false);
     }

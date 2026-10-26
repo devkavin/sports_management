@@ -45,6 +45,9 @@ and saved crews. All members can report damage; staff record repairs and outings
   changes invalidate other tokens; recovery/email confirmation requires signing
   in again. The old email stays active until confirmation.
 
+See [password and form UX notes](password-and-form-ux.md) for confirmation/reveal
+controls, the new-password policy and legacy bcrypt migration/recovery behavior.
+
 ## Email configuration
 
 Set these server environment variables, then restart the backend:

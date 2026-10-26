@@ -8,8 +8,34 @@ from app.core.security import verify_password, get_password_hash, create_access_
 from app.models.models import User, Club, UserRole
 from app.schemas.schemas import Token, LoginRequest, ClubCreate, UserCreate, UserOut
 from app.api.deps import get_current_user
+from app.core.security import password_needs_rehash
+import secrets
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+_dummy_hash = get_password_hash(secrets.token_urlsafe(32))
+LOGIN_ERROR = 'Incorrect email or password. Try again, or use Forgot password to reset it.'
+
+
+def _authenticate(db, email: str, password: str):
+    normalized = email.strip().lower()
+    user = db.query(User).filter(func.lower(User.email) == normalized).first()
+    if not user:
+        verify_password(password, _dummy_hash)
+        raise HTTPException(status_code=401, detail=LOGIN_ERROR)
+    if not verify_password(password, user.hashed_password) or not user.is_active:
+        raise HTTPException(status_code=401, detail=LOGIN_ERROR)
+    if password_needs_rehash(user.hashed_password):
+        old_hash, old_version = user.hashed_password, user.token_version
+        fresh = db.query(User).filter(User.id == user.id).populate_existing().with_for_update().first()
+        # Do not replace a reset/change that committed while bcrypt verification
+        # was running. A failed attempt never mutates credentials.
+        if not fresh or not fresh.is_active or fresh.hashed_password != old_hash or fresh.token_version != old_version or fresh.email.lower() != normalized:
+            raise HTTPException(status_code=401, detail=LOGIN_ERROR)
+        fresh.hashed_password = get_password_hash(password)
+        db.commit()
+        db.refresh(fresh)
+        user = fresh
+    return user
 
 @router.post("/register-club", response_model=Token)
 def register_club(payload: ClubCreate, db: Session = Depends(get_db)):
@@ -62,14 +88,7 @@ def register_club(payload: ClubCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(func.lower(User.email) == payload.email.strip().lower()).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-        )
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Account is deactivated")
+    user = _authenticate(db, payload.email, payload.password)
 
     access_token = create_access_token(subject=user.id, token_version=user.token_version)
     user_out = UserOut.model_validate(user)
@@ -84,14 +103,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/login-form", response_model=Token)
 def login_form(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(func.lower(User.email) == form_data.username.strip().lower()).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-        )
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Account is deactivated")
+    user = _authenticate(db, form_data.username, form_data.password)
     access_token = create_access_token(subject=user.id, token_version=user.token_version)
     user_out = UserOut.model_validate(user)
     if user.club:

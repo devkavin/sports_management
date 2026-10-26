@@ -1,3 +1,4 @@
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useState, useEffect } from 'react';
 import { PerformanceEntry, Schedule, TrainingSession } from '../../types';
 import { api } from '../../services/api';
@@ -13,6 +14,7 @@ import { AvailabilityModal } from '../availability/AvailabilityModal';
 import { useDashboardTab, useNavigation, useNavigationScroll } from '../../context/NavigationContext';
 
 export const TrainerDashboard: React.FC = () => {
+  const { notify, confirm } = useFeedback();
   const [pendingPerformances, setPendingPerformances] = useState<PerformanceEntry[]>([]);
   const [verifiedPerformances, setVerifiedPerformances] = useState<PerformanceEntry[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -87,7 +89,7 @@ export const TrainerDashboard: React.FC = () => {
       setSelectedPerfId(null);
       loadData();
     } catch (err: any) {
-      alert(`Error verifying performance: ${err.message}`);
+      notify(`Error verifying performance: ${err.message}`);
     } finally {
       setVerifying(false);
     }

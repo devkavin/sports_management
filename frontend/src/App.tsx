@@ -84,7 +84,7 @@ export const AppContent: React.FC = () => {
       <Header onOpenAuth={handleOpenAuth} onJoinClub={openMembership} />
 
       {/* Main Dynamic Role View */}
-      <main className="flex-1">
+      <main key={user?.id ?? 'public'} className="flex-1">
         {!user ? (
           /* Landing / Unauthenticated View */
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-20 flex flex-col items-center justify-center text-center space-y-8">

@@ -1,5 +1,6 @@
+import { EditorDialog } from '../common/FormPanel';
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { CalendarPlus, X } from 'lucide-react';
 import { Exercise, Schedule, TrainingSession } from '../../types';
 import { api } from '../../services/api';
@@ -73,6 +74,7 @@ export const ScheduleSessionModal: React.FC<ScheduleSessionModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { notify, confirm } = useFeedback();
   const { navigate } = useNavigation();
   const initialDraft = useMemo(() => {
     if (session) {
@@ -86,17 +88,7 @@ export const ScheduleSessionModal: React.FC<ScheduleSessionModalProps> = ({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setDraft(initialDraft), [initialDraft]);
-  useEffect(() => {
-    if (!schedule) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const handleEscape = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [schedule, onClose]);
+
 
   if (!schedule) return null;
 
@@ -108,7 +100,7 @@ export const ScheduleSessionModal: React.FC<ScheduleSessionModalProps> = ({
       } else {
         const occurrences = expandRecurringSession(draft);
         if (occurrences.some((occurrence) => occurrence.session_date.slice(0, 10) > schedule.end_date.slice(0, 10))) {
-          alert('The recurrence extends beyond the schedule end date. Reduce the number of occurrences or extend the schedule.');
+          notify('The recurrence extends beyond the schedule end date. Reduce the number of occurrences or extend the schedule.');
           return;
         }
         for (const occurrence of occurrences) {
@@ -118,28 +110,27 @@ export const ScheduleSessionModal: React.FC<ScheduleSessionModalProps> = ({
       await onSuccess();
       onClose();
     } catch (error: any) {
-      alert(`Error saving session: ${error.message}`);
+      notify(`Error saving session: ${error.message}`);
     } finally {
       setSaving(false);
     }
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 bg-slate-950/85 p-0 backdrop-blur-sm sm:p-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="schedule-session-title" className="mx-auto grid h-[100dvh] w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-slate-900 text-slate-100 shadow-2xl sm:my-[4dvh] sm:h-[92dvh] sm:max-h-[850px] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-slate-800">
+  return (
+    <EditorDialog title={duplicate ? 'Duplicate session' : session ? 'Edit session' : 'Add session'} onClose={onClose} busy={saving} dirty={JSON.stringify(draft) !== JSON.stringify(initialDraft)} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
+      <div  aria-labelledby="schedule-session-title" className="mx-auto grid h-[100dvh] w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-slate-900 text-slate-100 shadow-2xl sm:my-[4dvh] sm:h-[92dvh] sm:max-h-[850px] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-slate-800">
         <header className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300"><CalendarPlus className="h-4 w-4" /></span>
             <div className="min-w-0"><h2 id="schedule-session-title" className="truncate text-sm font-bold text-white">{duplicate ? 'Duplicate session' : session ? 'Edit session' : 'Add session'}</h2><p className="truncate text-xs text-slate-400">{schedule.name}</p></div>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="Close session editor" className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50"><X className="h-5 w-5" /></button>
+          <button type="button" data-editor-dismiss onClick={onClose} disabled={saving} aria-label="Close session editor" className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50"><X className="h-5 w-5" /></button>
         </header>
         <main className="min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6">
-          {session && !duplicate && <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">To change the time or duration, reschedule with a reason so participants are notified and boat bookings stay in sync.<button type="button" className="mt-2 block rounded-lg bg-sky-600 px-3 py-2 font-bold text-white" onClick={() => { onClose(); navigate(`operations/${session.id}`); }}>Open rescheduling & attendance</button></div>}
-          <SessionEditorForm value={draft} exercises={exercises} trainers={schedule.assigned_trainers || []} minDate={schedule.start_date.slice(0, 10)} maxDate={schedule.end_date.slice(0, 10)} allowRecurrence={!session || duplicate} timingLocked={Boolean(session && !duplicate)} onChange={(next) => setDraft(session && !duplicate ? { ...next, session_date: initialDraft.session_date, duration_minutes: initialDraft.duration_minutes } : next)} onCancel={onClose} onSave={save} saveLabel={duplicate ? 'Create duplicate' : session ? 'Save changes' : 'Add to schedule'} saving={saving} />
+          {session && !duplicate && <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">To change the time or duration, reschedule with a reason so participants are notified and boat bookings stay in sync.<button type="button" className="mt-2 block rounded-lg bg-sky-600 px-3 py-2 font-bold text-white" onClick={() => navigate(`operations/${session.id}`)}>Open rescheduling & attendance</button></div>}
+          <SessionEditorForm value={draft} exercises={exercises} trainers={schedule.assigned_trainers || []} minDate={schedule.start_date.slice(0, 10)} maxDate={schedule.end_date.slice(0, 10)} allowRecurrence={!session || duplicate} timingLocked={Boolean(session && !duplicate)} onChange={(next) => setDraft(session && !duplicate ? { ...next, session_date: initialDraft.session_date, duration_minutes: initialDraft.duration_minutes } : next)} onCancel={async () => { if (!saving && (JSON.stringify(draft) === JSON.stringify(initialDraft) || await confirm({ title: 'Discard session changes?', message: 'Your changes have not been saved.', confirmLabel: 'Discard changes', danger: true }))) onClose(); }} onSave={save} saveLabel={duplicate ? 'Create duplicate' : session ? 'Save changes' : 'Add to schedule'} saving={saving} />
         </main>
       </div>
-    </div>,
-    document.body,
+    </EditorDialog>
   );
 };

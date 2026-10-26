@@ -3,6 +3,8 @@ import asyncio
 from contextlib import suppress
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base, run_additive_migrations
@@ -50,6 +52,14 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request, error):
+    # Pydantic's default response includes the rejected input and ctx. Never
+    # echo passwords/tokens back in HTTP errors or return exception objects.
+    detail = [{key: item[key] for key in ('loc', 'msg', 'type') if key in item} for item in error.errors()]
+    return JSONResponse(status_code=422, content={'detail': detail})
 
 # Set all CORS enabled origins
 app.add_middleware(

@@ -5,6 +5,7 @@ import {
   TaxonomyNode, TaxonomyNodeTree, TaxonomyNodeCreate, AvailabilityEntry,
   AvailabilityConflict, AvailabilityStatus
 } from '../types';
+import { requestFailureMessage } from '../lib/formUx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -82,16 +83,17 @@ class ApiService {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    let response: Response;
+    try { response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
-    });
+    }); } catch { throw new Error(requestFailureMessage(0)); }
 
     if (!response.ok) {
-      let errorMsg = `HTTP Error: ${response.status} ${response.statusText}`;
+      let errorMsg = requestFailureMessage(response.status);
       try {
         const errorData = await response.json();
-        if (errorData.detail) errorMsg = formatApiError(errorData.detail, response.status);
+        if (errorData.detail && response.status < 500) errorMsg = formatApiError(errorData.detail, response.status);
       } catch (e) {
         // use default error message
       }

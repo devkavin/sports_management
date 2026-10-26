@@ -8,6 +8,7 @@ services:
     environment:
       - ENVIRONMENT=production
       - DATABASE_URL=${DATABASE_URL:?DATABASE_URL must be set}
+      - CA_CERT_PATH=${CA_CERT_PATH:-}
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set}
       - CORS_ORIGINS=${CORS_ORIGINS:?CORS_ORIGINS must be set}
       - ACCESS_TOKEN_EXPIRE_MINUTES=10080

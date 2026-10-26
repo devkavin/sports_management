@@ -1,5 +1,6 @@
+import { EditorDialog } from '../common/FormPanel';
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { CalendarOff, ShieldAlert, Trash2, X } from 'lucide-react';
 import { AvailabilityEntry, AvailabilityStatus, User } from '../../types';
 import { api } from '../../services/api';
@@ -24,6 +25,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
   onClose,
   onChanged,
 }) => {
+  const { notify, confirm } = useFeedback();
   const initialStart = new Date();
   initialStart.setMinutes(0, 0, 0);
   const initialEnd = new Date(initialStart.getTime() + 2 * 60 * 60 * 1000);
@@ -35,7 +37,14 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
   const [coachNotes, setCoachNotes] = useState('');
   const [privateNotes, setPrivateNotes] = useState('');
   const [safetyRestriction, setSafetyRestriction] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) return;
+    setDirty(false); setStartsAt(toLocalInput(initialStart)); setEndsAt(toLocalInput(initialEnd));
+    setStatus('unavailable'); setReason('personal'); setCoachNotes(''); setPrivateNotes(''); setSafetyRestriction(false);
+  }, [isOpen]);
 
   const load = async () => {
     const data = await api.getAvailability(member?.id);
@@ -43,7 +52,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) load().catch(() => setEntries([]));
+    if (isOpen) load().catch((error) => notify(`Unable to load availability: ${error.message}`));
   }, [isOpen, member?.id]);
 
   if (!isOpen) return null;
@@ -51,7 +60,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (new Date(endsAt) <= new Date(startsAt)) {
-      alert('The end must be after the start.');
+      notify('The end must be after the start.');
       return;
     }
     setSaving(true);
@@ -66,39 +75,44 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
         private_notes: privateNotes || undefined,
         is_safety_restriction: allowSafetyRestriction && safetyRestriction,
       });
+      setDirty(false);
+      notify('Availability saved.', 'success');
       setCoachNotes('');
       setPrivateNotes('');
       await load();
       onChanged?.();
     } catch (error: any) {
-      alert(`Unable to save availability: ${error.message}`);
+      notify(`Unable to save availability: ${error.message}`);
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (entryId: number) => {
+    if (saving) return;
+    setSaving(true);
     try {
+      if (!await confirm({ title: 'Remove availability?', message: 'Coaches will no longer see this availability entry or restriction.', confirmLabel: 'Remove entry', danger: true })) return;
       await api.deleteAvailability(entryId);
       await load();
       onChanged?.();
     } catch (error: any) {
-      alert(`Unable to remove availability: ${error.message}`);
-    }
+      notify(`Unable to remove availability: ${error.message}`);
+    } finally { setSaving(false); }
   };
 
   const modal = (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/85 p-0 backdrop-blur-sm sm:p-4">
+    <EditorDialog title="Availability" onClose={onClose} busy={saving} dirty={dirty} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
       <div className="mx-auto min-h-[100dvh] w-full max-w-2xl space-y-4 bg-slate-900 p-4 shadow-2xl sm:my-[4dvh] sm:min-h-0 sm:max-h-[92dvh] sm:overflow-y-auto sm:rounded-3xl sm:border sm:border-slate-800 sm:p-6">
         <div className="flex items-start justify-between border-b border-slate-800 pb-4">
           <div>
             <h2 className="flex items-center gap-2 text-base font-bold text-white"><CalendarOff className="h-5 w-5 text-amber-400" /> Availability</h2>
             <p className="mt-1 text-xs text-slate-400">{member ? `Manage ${member.full_name}'s availability` : 'Tell coaches when you are unavailable or limited.'}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button>
+          <button type="button" data-editor-dismiss onClick={onClose} className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button>
         </div>
 
-        <form onSubmit={save} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+        <form onChangeCapture={() => setDirty(true)} onSubmit={save} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-xs font-semibold text-slate-300">From
               <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" required />
@@ -156,13 +170,13 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
                 <div className="mt-1 text-[11px] text-slate-400">{new Date(entry.starts_at).toLocaleString()} – {new Date(entry.ends_at).toLocaleString()}</div>
                 {entry.coach_visible_notes && <div className="mt-1 text-[11px] text-slate-300">{entry.coach_visible_notes}</div>}
               </div>
-              <button type="button" onClick={() => remove(entry.id)} className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" aria-label="Remove availability"><Trash2 className="h-4 w-4" /></button>
+              <button type="button" disabled={saving} onClick={() => remove(entry.id)} className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" aria-label="Remove availability"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
           {!entries.length && <div className="rounded-xl border border-dashed border-slate-700 py-5 text-center text-xs text-slate-500">No availability restrictions recorded.</div>}
         </div>
       </div>
-    </div>
+    </EditorDialog>
   );
-  return createPortal(modal, document.body);
+  return modal;
 };

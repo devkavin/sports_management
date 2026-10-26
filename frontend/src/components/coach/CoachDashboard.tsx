@@ -1,3 +1,5 @@
+import { EditorDialog } from '../common/FormPanel';
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useState, useEffect } from 'react';
 import { Club, CoachAnalyticsSummary, Schedule, ScheduleAdherence, Competition, Equipment, Exercise, TrainingSession, User } from '../../types';
 import { api } from '../../services/api';
@@ -28,6 +30,7 @@ const splitToSeconds = (value: string): number | null => {
 const secondsToSplit = (value?: number) => value ? `${Math.floor(value / 60)}:${(value % 60).toFixed(1).padStart(4, '0')}` : '';
 
 export const CoachDashboard: React.FC = () => {
+  const { notify, confirm } = useFeedback();
   const [summary, setSummary] = useState<CoachAnalyticsSummary | null>(null);
   const [club, setClub] = useState<Club | null>(null);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -49,6 +52,8 @@ export const CoachDashboard: React.FC = () => {
   const [sessionModal, setSessionModal] = useState<{ schedule: Schedule; session?: TrainingSession; duplicate?: boolean } | null>(null);
 
   // New Competition Form State
+  const [competitionSaving, setCompetitionSaving] = useState(false);
+  const [benchmarkSaving, setBenchmarkSaving] = useState(false);
   const [showCompModal, setShowCompModal] = useState(false);
   const [compName, setCompName] = useState('');
   const [compLocation, setCompLocation] = useState('');
@@ -101,6 +106,8 @@ export const CoachDashboard: React.FC = () => {
 
   const handleCreateCompetition = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (competitionSaving) return;
+    setCompetitionSaving(true);
     try {
       await api.createCompetition({
         name: compName,
@@ -114,8 +121,8 @@ export const CoachDashboard: React.FC = () => {
       setCompLocation(''); setCompDist(''); setCompStartDate(''); setCompEndDate('');
       loadData();
     } catch (err: any) {
-      alert(`Error creating competition: ${err.message}`);
-    }
+      notify(`Error creating competition: ${err.message}`);
+    } finally { setCompetitionSaving(false); }
   };
 
   const handleBroadcast = async (e: React.FormEvent) => {
@@ -131,9 +138,9 @@ export const CoachDashboard: React.FC = () => {
       setShowBroadcastModal(false);
       setBroadcastTitle('');
       setBroadcastMsg('');
-      alert('Announcement broadcast successfully sent to squad members!');
+      notify('Announcement broadcast successfully sent to squad members!', 'success');
     } catch (err: any) {
-      alert(`Error broadcasting announcement: ${err.message}`);
+      notify(`Error broadcasting announcement: ${err.message}`);
     } finally {
       setBroadcasting(false);
     }
@@ -141,10 +148,13 @@ export const CoachDashboard: React.FC = () => {
 
   const saveBenchmarks = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (benchmarkSplit && !splitToSeconds(benchmarkSplit)) return alert('Enter the benchmark as M:SS.s');
-    if (goldSplit && !splitToSeconds(goldSplit)) return alert('Enter the gold standard as M:SS.s');
-    const updated = await api.updateClubSettings({ benchmark_2k_split_seconds: splitToSeconds(benchmarkSplit), gold_2k_split_seconds: splitToSeconds(goldSplit) });
-    setClub(updated);
+    if (benchmarkSplit && !splitToSeconds(benchmarkSplit)) return notify('Enter the benchmark as M:SS.s');
+    if (goldSplit && !splitToSeconds(goldSplit)) return notify('Enter the gold standard as M:SS.s');
+    if (benchmarkSaving) return;
+    setBenchmarkSaving(true);
+    try { const updated = await api.updateClubSettings({ benchmark_2k_split_seconds: splitToSeconds(benchmarkSplit), gold_2k_split_seconds: splitToSeconds(goldSplit) });
+    setClub(updated); notify('Benchmarks saved.', 'success');
+    } catch (err: any) { notify(`Unable to save benchmarks: ${err.message}`); } finally { setBenchmarkSaving(false); }
   };
 
   return (
@@ -553,7 +563,7 @@ export const CoachDashboard: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'conditions' && <div className="space-y-6"><BoathouseWeatherWidget userRole="coach" /><form onSubmit={saveBenchmarks} className="rounded-3xl border border-slate-800 bg-slate-900 p-5"><h3 className="font-extrabold text-white">Club 2k comparison standards</h3><p className="mt-1 text-xs text-slate-400">Optional reference lines for charts. These are club settings—not athlete results.</p><div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><label className="text-xs font-semibold text-slate-300">Benchmark split /500m<input value={benchmarkSplit} onChange={(e) => setBenchmarkSplit(e.target.value)} placeholder="M:SS.s" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label><label className="text-xs font-semibold text-slate-300">Gold standard /500m<input value={goldSplit} onChange={(e) => setGoldSplit(e.target.value)} placeholder="M:SS.s" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label><button className="self-end rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">Save standards</button></div></form></div>}
+      {activeTab === 'conditions' && <div className="space-y-6"><BoathouseWeatherWidget userRole="coach" /><form onSubmit={saveBenchmarks} className="rounded-3xl border border-slate-800 bg-slate-900 p-5"><h3 className="font-extrabold text-white">Club 2k comparison standards</h3><p className="mt-1 text-xs text-slate-400">Optional reference lines for charts. These are club settings—not athlete results.</p><div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><label className="text-xs font-semibold text-slate-300">Benchmark split /500m<input value={benchmarkSplit} onChange={(e) => setBenchmarkSplit(e.target.value)} placeholder="M:SS.s" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label><label className="text-xs font-semibold text-slate-300">Gold standard /500m<input value={goldSplit} onChange={(e) => setGoldSplit(e.target.value)} placeholder="M:SS.s" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label><button disabled={benchmarkSaving} className="self-end rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">{benchmarkSaving ? 'Saving…' : 'Save standards'}</button></div></form></div>}
       {activeTab === 'equipment' && <EquipmentManager items={equipmentList} onRefresh={loadData} />}
       {activeTab === 'exercises' && <ExerciseManager items={exercisesList} equipment={equipmentList} onRefresh={loadData} />}
       {activeTab === 'membership' && <div className="space-y-6"><MembershipManager userRole="coach" onChanged={loadData} /><MembersManager onChanged={loadData} /></div>}
@@ -594,7 +604,7 @@ export const CoachDashboard: React.FC = () => {
 
       {/* Create Competition Modal */}
       {showCompModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <EditorDialog title="Add competition" onClose={() => setShowCompModal(false)} busy={competitionSaving} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
             <h3 className="text-lg font-bold text-white">Add Target Regatta / Competition</h3>
             <form onSubmit={handleCreateCompetition} className="space-y-3">
@@ -640,26 +650,27 @@ export const CoachDashboard: React.FC = () => {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCompModal(false)}
+                  data-editor-dismiss onClick={() => setShowCompModal(false)}
                   className="px-3 py-1.5 text-xs text-slate-400"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  disabled={competitionSaving}
                   className="px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs"
                 >
-                  Save Regatta
+                  {competitionSaving ? 'Saving…' : 'Save Regatta'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </EditorDialog>
       )}
 
       {/* Broadcast Announcement Modal */}
       {showBroadcastModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+        <EditorDialog title="Broadcast announcement" onClose={() => setShowBroadcastModal(false)} busy={broadcasting} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
           <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
@@ -669,7 +680,7 @@ export const CoachDashboard: React.FC = () => {
                 <h3 className="text-sm font-bold text-white">Broadcast Announcement</h3>
               </div>
               <button
-                onClick={() => setShowBroadcastModal(false)}
+                data-editor-dismiss aria-label="Close announcement editor" onClick={() => setShowBroadcastModal(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-white"
               >
                 <X className="w-4 h-4" />
@@ -717,7 +728,7 @@ export const CoachDashboard: React.FC = () => {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowBroadcastModal(false)}
+                  data-editor-dismiss aria-label="Close announcement editor" onClick={() => setShowBroadcastModal(false)}
                   className="px-3 py-2 text-xs text-slate-400 hover:text-white"
                 >
                   Cancel
@@ -732,7 +743,7 @@ export const CoachDashboard: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </EditorDialog>
       )}
     </div>
   );

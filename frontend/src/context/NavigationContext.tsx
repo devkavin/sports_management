@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { resolveDestination } from '../lib/navigation';
+import { useFeedback } from './FeedbackContext';
+import { guardBrowserNavigation } from '../lib/formUx';
 
 interface Destination { view: string; target?: number; revision: number; }
 interface Navigation { destination: Destination; navigate: (action: string) => void; }
@@ -8,17 +10,37 @@ const Context = createContext<Navigation | null>(null);
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { confirmNavigation } = useFeedback();
+  const navigationBusy = useRef(false);
+  const acceptedUrl = useRef(window.location.href);
   const [destination, setDestination] = useState<Destination>({ view: '', revision: 0 });
   const resolve = (action: string) => resolveDestination(user?.role, action);
-  const navigate = (action: string) => {
-    const next = resolve(action);
-    const hash = next.view + (next.target ? '/' + next.target : '');
-    window.history.pushState(null, '', window.location.pathname + window.location.search + '#' + hash);
-    setDestination((old) => ({ ...next, revision: old.revision + 1 }));
+  const navigate = async (action: string) => {
+    if (navigationBusy.current) return;
+    navigationBusy.current = true;
+    try {
+      if (!await confirmNavigation()) return;
+      const next = resolve(action);
+      const hash = next.view + (next.target ? '/' + next.target : '');
+      window.history.pushState(null, '', window.location.pathname + window.location.search + '#' + hash);
+      acceptedUrl.current = window.location.href;
+      setDestination((old) => ({ ...next, revision: old.revision + 1 }));
+    } finally { navigationBusy.current = false; }
   };
   useEffect(() => {
-    const sync = () => setDestination((old) => ({ ...resolve(window.location.hash), revision: old.revision + 1 }));
-    sync();
+    const sync = async () => {
+      const requested = window.location.href;
+      if (requested === acceptedUrl.current) return;
+      if (navigationBusy.current) { window.history.replaceState(null, '', acceptedUrl.current); return; }
+      navigationBusy.current = true;
+      try {
+        if (!await guardBrowserNavigation(requested, acceptedUrl.current, confirmNavigation, (url) => window.history.replaceState(null, '', url))) return;
+        acceptedUrl.current = requested;
+        setDestination((old) => ({ ...resolve(new URL(requested).hash), revision: old.revision + 1 }));
+      } finally { navigationBusy.current = false; }
+    };
+    acceptedUrl.current = window.location.href;
+    setDestination((old) => ({ ...resolve(window.location.hash), revision: old.revision + 1 }));
     window.addEventListener('hashchange', sync);
     window.addEventListener('popstate', sync);
     return () => { window.removeEventListener('hashchange', sync); window.removeEventListener('popstate', sync); };

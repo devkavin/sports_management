@@ -1,3 +1,4 @@
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, Clipboard, Mail, ShieldCheck, UserCheck, UserPlus, X } from 'lucide-react';
 import { api } from '../../services/api';
@@ -20,6 +21,7 @@ const field = 'mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-950 px-
 const parseDate = (value: string) => new Date(/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? value : value + 'Z');
 
 export const MembershipManager: React.FC<Props> = ({ userRole, onChanged, invitationRequest }) => {
+  const { notify, confirm } = useFeedback();
   const [requests, setRequests] = useState<ClubJoinRequest[]>([]);
   const [invitations, setInvitations] = useState<ClubInvitation[]>([]);
   const [club, setClub] = useState<Club | null>(null);
@@ -54,8 +56,10 @@ export const MembershipManager: React.FC<Props> = ({ userRole, onChanged, invita
   const pending = useMemo(() => requests.filter((item) => item.status === 'pending'), [requests]);
 
   const review = async (item: ClubJoinRequest, approve: boolean) => {
+    if (busy) return;
     setBusy(true); setError('');
     try {
+      if (!await confirm({ title: approve ? 'Approve club membership?' : 'Reject membership request?', message: approve ? `Grant ${item.full_name} athlete access to this club?` : `Reject the request from ${item.full_name}? They will not receive club access.`, confirmLabel: approve ? 'Approve membership' : 'Reject request', danger: !approve })) return;
       if (approve) await api.approveJoinRequest(item.id);
       else await api.rejectJoinRequest(item.id);
       await load(); onChanged?.();
@@ -78,14 +82,17 @@ export const MembershipManager: React.FC<Props> = ({ userRole, onChanged, invita
     finally { setBusy(false); }
   };
   const setPolicy = async (policy: Club['athlete_join_policy']) => {
+    if (busy) return;
     setBusy(true); setError('');
-    try { setClub(await api.updateClubSettings({ athlete_join_policy: policy })); }
+    try { if (!await confirm({ title: 'Change athlete joining policy?', message: 'This changes how new athletes can request access to your club.', confirmLabel: 'Change policy' })) return; setClub(await api.updateClubSettings({ athlete_join_policy: policy })); }
     catch (err: any) { setError(err.message); }
     finally { setBusy(false); }
   };
   const revoke = async (item: ClubInvitation) => {
+    if (busy) return;
     setBusy(true); setError('');
     try {
+      if (!await confirm({ title: 'Revoke invitation?', message: `The invitation for ${item.email} will stop granting club access.`, confirmLabel: 'Revoke invitation', danger: true })) return;
       await api.revokeClubInvitation(item.id);
       if (createdInvite?.email === item.email && createdInvite.role === item.role) setCreatedInvite(null);
       await load();
@@ -93,6 +100,7 @@ export const MembershipManager: React.FC<Props> = ({ userRole, onChanged, invita
     finally { setBusy(false); }
   };
   const resend = async (item: ClubInvitation) => {
+    if (busy) return;
     setBusy(true); setError('');
     try {
       const created = await api.resendInvitation(item.id);

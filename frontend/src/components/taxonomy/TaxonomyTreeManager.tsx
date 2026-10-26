@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { EditorDialog } from '../common/FormPanel';
+import { useFeedback } from '../../context/FeedbackContext';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../services/api';
 import { TaxonomyNodeTree, TaxonomyNodeStatus } from '../../types';
 import { 
@@ -16,6 +18,8 @@ export const TaxonomyTreeManager: React.FC<TaxonomyTreeManagerProps> = ({
   userRole = 'coach',
   onTreeChanged 
 }) => {
+  const { notify, confirm } = useFeedback();
+  const mutationPending = useRef(false);
   const [tree, setTree] = useState<TaxonomyNodeTree[]>([]);
   const [loading, setLoading] = useState(true);
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -132,45 +136,57 @@ export const TaxonomyTreeManager: React.FC<TaxonomyTreeManagerProps> = ({
   };
 
   const handleArchive = async (node: TaxonomyNodeTree) => {
-    if (!confirm(`Archive "${node.name}"? It will be hidden from new schedule selections.`)) return;
+    if (mutationPending.current) return;
+    mutationPending.current = true;
     try {
+    if (!await confirm({ title: 'Archive branch?', message: `Archive "${node.name}"? It will be hidden from new schedule selections.`, confirmLabel: 'Archive branch', danger: true })) return;
+
       await api.archiveTaxonomyNode(node.id);
       await loadTree();
       if (onTreeChanged) onTreeChanged();
     } catch (err: any) {
-      alert(`Error archiving node: ${err.message}`);
-    }
+      notify(`Error archiving node: ${err.message}`);
+    } finally { mutationPending.current = false; }
   };
 
   const handleRestore = async (node: TaxonomyNodeTree) => {
+    if (mutationPending.current) return;
+    mutationPending.current = true;
     try {
+
       await api.restoreTaxonomyNode(node.id);
       await loadTree();
       if (onTreeChanged) onTreeChanged();
     } catch (err: any) {
-      alert(`Error restoring node: ${err.message}`);
-    }
+      notify(`Error restoring node: ${err.message}`);
+    } finally { mutationPending.current = false; }
   };
 
   const handleDelete = async (node: TaxonomyNodeTree) => {
-    if (!confirm(`Soft-delete "${node.name}" and all its sub-branches?`)) return;
+    if (mutationPending.current) return;
+    mutationPending.current = true;
     try {
+    if (!await confirm({ title: 'Delete branch?', message: `Soft-delete "${node.name}" and all its sub-branches?`, confirmLabel: 'Delete branch', danger: true })) return;
+
       await api.deleteTaxonomyNode(node.id);
       await loadTree();
       if (onTreeChanged) onTreeChanged();
     } catch (err: any) {
-      alert(`Error deleting node: ${err.message}`);
-    }
+      notify(`Error deleting node: ${err.message}`);
+    } finally { mutationPending.current = false; }
   };
 
   const handleRecover = async (node: TaxonomyNodeTree) => {
+    if (mutationPending.current) return;
+    mutationPending.current = true;
     try {
+
       await api.recoverTaxonomyNode(node.id);
       await loadTree();
       if (onTreeChanged) onTreeChanged();
     } catch (err: any) {
-      alert(`Error recovering node: ${err.message}`);
-    }
+      notify(`Error recovering node: ${err.message}`);
+    } finally { mutationPending.current = false; }
   };
 
   // Helper to get flat list for move selector
@@ -427,7 +443,7 @@ export const TaxonomyTreeManager: React.FC<TaxonomyTreeManagerProps> = ({
 
       {/* Node Create / Edit / Move Modal */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+        <EditorDialog title={modalMode + ' taxonomy branch'} onClose={() => setModalMode(null)} busy={submitting} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
           <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
@@ -442,7 +458,7 @@ export const TaxonomyTreeManager: React.FC<TaxonomyTreeManagerProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setModalMode(null)}
+                data-editor-dismiss onClick={() => setModalMode(null)}
                 className="p-1 rounded-lg text-slate-400 hover:text-white"
               >
                 <X className="w-4 h-4" />
@@ -508,7 +524,7 @@ export const TaxonomyTreeManager: React.FC<TaxonomyTreeManagerProps> = ({
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setModalMode(null)}
+                  data-editor-dismiss onClick={() => setModalMode(null)}
                   className="px-3 py-2 text-xs text-slate-400 hover:text-white"
                 >
                   Cancel
@@ -523,7 +539,7 @@ export const TaxonomyTreeManager: React.FC<TaxonomyTreeManagerProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </EditorDialog>
       )}
     </div>
   );

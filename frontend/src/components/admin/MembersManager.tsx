@@ -1,3 +1,5 @@
+import { useFeedback } from '../../context/FeedbackContext';
+import { memberAccessConfirmation } from '../../lib/formUx';
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -5,6 +7,7 @@ import { User, UserRole, BoatSidePreference } from '../../types';
 import { buttonClass, smallButtonClass, inputClass, FormModal, Field } from '../common/FormPanel';
 
 export const MembersManager: React.FC<{ onChanged?: () => void }> = ({ onChanged }) => {
+  const { notify, confirm } = useFeedback();
   const { user, logout } = useAuth();
   const [members, setMembers] = useState<User[]>([]);
   const [query, setQuery] = useState('');
@@ -21,9 +24,12 @@ export const MembersManager: React.FC<{ onChanged?: () => void }> = ({ onChanged
     (roleFilter === 'all' || member.role === roleFilter) &&
     (statusFilter === 'all' || member.is_active === (statusFilter === 'active'))), [members, query, roleFilter, statusFilter]);
   const save = async (event: React.FormEvent) => {
-    event.preventDefault(); if (!editing) return;
+    event.preventDefault(); if (!editing || busy) return;
     setBusy(true); setError('');
     try {
+      const original = members.find((member) => member.id === editing.id);
+      const question = memberAccessConfirmation(original, editing, user?.id || 0);
+      if (user?.role === 'admin' && question && !await confirm(question)) return;
       const profile = { full_name: editing.full_name.trim(), weight_kg: editing.weight_kg ?? null, height_cm: editing.height_cm ?? null, side_preference: editing.side_preference || null };
       await api.updateMember(editing.id, user?.role === 'admin' ? { ...profile, role: editing.role, is_active: editing.is_active } : profile);
       if (editing.id === user?.id && (editing.role !== user.role || !editing.is_active)) { logout(); return; }
@@ -37,7 +43,7 @@ export const MembersManager: React.FC<{ onChanged?: () => void }> = ({ onChanged
     <p className="text-xs text-slate-400">{filtered.length} of {members.length} members</p>
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filtered.map((member) => <article key={member.id} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900 p-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><h4 className="truncate font-bold text-white">{member.full_name}</h4><p className="break-words text-xs text-slate-400">{member.email}</p></div><span className={'text-xs font-semibold ' + (member.is_active ? 'text-emerald-300' : 'text-rose-300')}>{member.is_active ? 'Active' : 'Suspended'}</span></div><p className="text-xs capitalize text-slate-300">{member.role} · {member.side_preference || 'Side not set'}{member.weight_kg ? ' · ' + member.weight_kg + ' kg' : ''}</p>{(user?.role === 'admin' || member.role === 'athlete') && <button type="button" className={smallButtonClass} onClick={() => { setEditing({ ...member }); setError(''); }}>Edit {user?.role === 'admin' ? 'profile & access' : 'profile'}</button>}</article>)}</div>
     {!filtered.length && <p className="rounded-xl border border-dashed border-slate-700 p-5 text-center text-sm text-slate-400">{loading ? 'Loading members…' : 'No members match these filters.'}</p>}
-    {editing && <FormModal title={'Edit ' + editing.full_name} onClose={() => setEditing(null)}><form onSubmit={save} className="space-y-4">
+    {editing && <FormModal busy={busy} dirty={JSON.stringify(editing) !== JSON.stringify(members.find((member) => member.id === editing.id))} title={'Edit ' + editing.full_name} onClose={() => setEditing(null)}><form onSubmit={save} className="space-y-4">
       {error && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
       <Field label="Full name"><input required value={editing.full_name} onChange={(event) => setEditing({ ...editing, full_name: event.target.value })} className={inputClass} /></Field>
       <p className="text-xs text-slate-400">{editing.email} · Email changes are confirmed by the member through Account settings.</p>

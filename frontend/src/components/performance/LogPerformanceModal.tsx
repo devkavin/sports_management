@@ -1,3 +1,5 @@
+import { EditorDialog } from '../common/FormPanel';
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useState, useEffect } from 'react';
 import { Exercise, TrainingSession, PerformanceEntry } from '../../types';
 import { api } from '../../services/api';
@@ -19,6 +21,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
   initialSession,
   exercises,
 }) => {
+  const { notify, confirm } = useFeedback();
   const [selectedExerciseId, setSelectedExerciseId] = useState<number>(
     exercises[0]?.id || 0
   );
@@ -37,6 +40,12 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
   const [seatPosition, setSeatPosition] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) return;
+    setDistanceM(''); setActualReps(''); setActualWeightKg(''); setTimeMin(''); setTimeSec(''); setActualWatts('');
+    setStrokeRate(''); setAvgHeartRate(''); setDragFactor(''); setRpe(''); setSeatPosition(''); setNotes('');
+  }, [isOpen]);
 
   useEffect(() => {
     if (exercises.length > 0 && !selectedExerciseId) {
@@ -130,7 +139,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
       onSuccess(entry);
       onClose();
     } catch (err: any) {
-      alert(`Error logging workout: ${err.message}`);
+      notify(`Error logging workout: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -147,7 +156,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+    <EditorDialog title="Record workout performance" onClose={onClose} busy={submitting} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
       <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-100 animate-in fade-in zoom-in-95 duration-150 my-8">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div>
@@ -173,7 +182,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
             </div>
           )}
           <button
-            onClick={onClose}
+            data-editor-dismiss onClick={onClose}
             className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -372,7 +381,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
           <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
             <button
               type="button"
-              onClick={onClose}
+              data-editor-dismiss onClick={onClose}
               className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
             >
               Cancel
@@ -388,6 +397,6 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </EditorDialog>
   );
 };

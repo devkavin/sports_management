@@ -1,6 +1,7 @@
 from typing import List, Optional, Any, Dict, Literal
 from datetime import datetime, timezone
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
+from app.core.password_policy import NewPassword
 from app.models.models import (
     UserRole, BoatSidePreference, EquipmentCategory, ExerciseCategory, SchedulePhase,
     SafetyFlagStatus, NotificationType, TaxonomyNodeStatus, AvailabilityStatus
@@ -21,7 +22,7 @@ class LoginRequest(BaseModel):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: NewPassword
     full_name: str = Field(min_length=1, max_length=255)
     role: UserRole = UserRole.ATHLETE
     club_id: Optional[int] = None
@@ -63,7 +64,7 @@ class ClubCreate(BaseModel):
     description: Optional[str] = None
     admin_name: str = Field(min_length=1, max_length=255)
     admin_email: EmailStr
-    admin_password: str = Field(min_length=8)
+    admin_password: NewPassword
 
 class ClubOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -95,7 +96,7 @@ class ClubJoinRequestCreate(BaseModel):
     club_code: str = Field(min_length=2, max_length=64)
     full_name: str = Field(min_length=1, max_length=255)
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: NewPassword
     weight_kg: Optional[float] = Field(None, gt=0)
     height_cm: Optional[float] = Field(None, gt=0)
     side_preference: Optional[BoatSidePreference] = None
@@ -148,7 +149,7 @@ class ClubInvitationPreview(BaseModel):
 class ClubInvitationAccept(BaseModel):
     token: str = Field(min_length=20)
     full_name: str = Field(min_length=1, max_length=255)
-    password: str = Field(min_length=8)
+    password: NewPassword
     weight_kg: Optional[float] = Field(None, gt=0)
     height_cm: Optional[float] = Field(None, gt=0)
     side_preference: Optional[BoatSidePreference] = None

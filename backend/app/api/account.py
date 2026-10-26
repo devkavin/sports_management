@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token
+from app.core.password_policy import NewPassword
 from app.api.deps import get_current_user
 from app.models.models import User, BoatSidePreference
 from app.models.operations import AccountAction, utcnow
@@ -26,7 +27,7 @@ class ProfileUpdate(BaseModel):
 
 class PasswordChange(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=8, max_length=72)
+    new_password: NewPassword
 
 
 class EmailChange(BaseModel):
@@ -40,7 +41,7 @@ class ResetRequest(BaseModel):
 
 class ActionInput(BaseModel):
     token: str = Field(min_length=20, max_length=256)
-    new_password: str | None = Field(None, min_length=8, max_length=72)
+    new_password: NewPassword | None = None
 
 
 def require_mail():

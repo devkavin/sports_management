@@ -45,7 +45,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (email: string, pass: string) => {
     authRevision.current += 1;
-    setLoading(true);
+    // `loading` belongs to startup only. Form components own request progress;
+    // toggling it here unmounts dialogs and loses their errors/draft fields.
     try {
       const response = await api.login(email, pass);
       setUser(response.user);
@@ -60,7 +61,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const registerClub = async (data: any) => {
     authRevision.current += 1;
-    setLoading(true);
     try {
       const response = await api.registerClub(data);
       setUser(response.user);
@@ -75,7 +75,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const acceptInvitation = async (data: any) => {
     authRevision.current += 1;
-    setLoading(true);
     try {
       const response = await api.acceptClubInvitation(data);
       setUser(response.user);

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { NotificationDropdown } from '../notifications/NotificationDropdown';
 import { useNavigation } from '../../context/NavigationContext';
+import { useFeedback } from '../../context/FeedbackContext';
 
 interface HeaderProps {
   onOpenAuth: (mode: 'login' | 'register') => void;
@@ -16,6 +17,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onOpenAuth, onJoinClub }) => {
   const { navigate } = useNavigation();
   const { user, logout } = useAuth();
+  const { confirmNavigation } = useFeedback();
   const { availableTours, startTour, isTourCompleted } = useTour();
   const [showTourMenu, setShowTourMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -177,7 +179,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth, onJoinClub }) => {
                       <div className="my-1 border-t border-slate-800" />
 
                       <button
-                        onClick={logout}
+                      onClick={async () => { if (await confirmNavigation()) { setShowUserMenu(false); logout(); } }}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 transition-colors text-left"
                       >
                         <LogOut className="w-3.5 h-3.5" />

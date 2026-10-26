@@ -1,5 +1,6 @@
+import { EditorDialog } from '../common/FormPanel';
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   ArrowRight,
@@ -47,7 +48,9 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   exercises,
   members,
 }) => {
+  const { notify, confirm } = useFeedback();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const initialDate = useRef(new Date().toISOString().split('T')[0]).current;
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -64,34 +67,13 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   const [editingSession, setEditingSession] = useState<SessionDraft | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
     setStep(0);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-      if (event.key === 'Tab' && dialogRef.current) {
-        const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )).filter((element) => element.offsetParent !== null);
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+    if (!isOpen) {
+      setName(''); setDescription(''); setSeason(''); setPhase('base_endurance');
+      setCompetitionId(''); setSelectedTaxonomyNode(null); setAthleteIds([]); setTrainerIds([]); setSessions([]); setEditingSession(null);
+      setStartDate(initialDate); setEndDate(initialDate);
+    }
+  }, [isOpen]);
 
   const expandedSessions = useMemo(() => sessions.flatMap(expandRecurringSession), [sessions]);
   const plannedSessions = useMemo(() => expandedSessions.map((session) => ({
@@ -107,12 +89,12 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
 
   const goNext = () => {
     if (step === 0) {
-      if (!name.trim()) return alert('Enter a schedule title.');
-      if (!startDate || !endDate || new Date(endDate) < new Date(startDate)) return alert('Choose a valid schedule date range.');
+      if (!name.trim()) return notify('Enter a schedule title.');
+      if (!startDate || !endDate || new Date(endDate) < new Date(startDate)) return notify('Choose a valid schedule date range.');
     }
-    if (step === 1 && athleteIds.length === 0) return alert('Select at least one athlete for this schedule.');
-    if (step === 2 && sessions.length === 0) return alert('Create at least one training session.');
-    if (step === 2 && expandedSessions.some((session) => session.session_date.slice(0, 10) > endDate)) return alert('A recurring session extends beyond the schedule end date. Reduce its occurrences or extend the schedule.');
+    if (step === 1 && athleteIds.length === 0) return notify('Select at least one athlete for this schedule.');
+    if (step === 2 && sessions.length === 0) return notify('Create at least one training session.');
+    if (step === 2 && expandedSessions.some((session) => session.session_date.slice(0, 10) > endDate)) return notify('A recurring session extends beyond the schedule end date. Reduce its occurrences or extend the schedule.');
     setStep((current) => Math.min(current + 1, STEPS.length - 1));
   };
 
@@ -120,7 +102,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
     if (step !== STEPS.length - 1) return;
     if (!athleteIds.length) {
       setStep(1);
-      alert('Select at least one athlete for this schedule.');
+      notify('Select at least one athlete for this schedule.');
       return;
     }
     setSubmitting(true);
@@ -147,7 +129,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
       onSuccess();
       onClose();
     } catch (error: any) {
-      alert(`Error creating schedule: ${error.message}`);
+      notify(`Error creating schedule: ${error.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -156,11 +138,9 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   const fieldClass = 'w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-xs text-white outline-none focus:ring-2 focus:ring-amber-500';
 
   const modal = (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 p-0 backdrop-blur-sm sm:p-4" role="presentation">
+    <EditorDialog title="Create squad training block" onClose={onClose} busy={submitting} dirty={Boolean(name || description || season || competitionId || selectedTaxonomyNode || athleteIds.length || trainerIds.length || sessions.length || editingSession || phase !== 'base_endurance' || startDate !== initialDate || endDate !== initialDate)} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
       <div
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="create-schedule-title"
         className="mx-auto grid h-[100dvh] w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border-slate-800 bg-slate-900 text-slate-100 shadow-2xl sm:my-[4dvh] sm:h-[92dvh] sm:max-h-[900px] sm:max-w-5xl sm:rounded-3xl sm:border"
       >
@@ -173,7 +153,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                 <p className="hidden text-xs text-slate-400 sm:block">Build the plan, choose its roster, then review before publishing.</p>
               </div>
             </div>
-            <button type="button" onClick={onClose} disabled={submitting} autoFocus className="shrink-0 rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50" aria-label="Close schedule builder"><X className="h-5 w-5" /></button>
+            <button type="button" data-editor-dismiss onClick={onClose} disabled={submitting} autoFocus className="shrink-0 rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50" aria-label="Close schedule builder"><X className="h-5 w-5" /></button>
           </div>
 
           <nav className="mt-3 flex gap-1 overflow-x-auto pb-1 sm:mt-4 sm:grid sm:grid-cols-4" aria-label="Schedule creation steps">
@@ -330,7 +310,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
         </main>
 
         <footer className="flex items-center justify-between gap-3 border-t border-slate-800 bg-slate-900/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
-          <button type="button" onClick={onClose} disabled={submitting} className="hidden px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white disabled:opacity-50 sm:block">Cancel</button>
+          <button type="button" data-editor-dismiss onClick={onClose} disabled={submitting} className="hidden px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white disabled:opacity-50 sm:block">Cancel</button>
           <span className="text-[11px] font-semibold text-slate-500 sm:hidden">{step + 1} / {STEPS.length}</span>
           <div className="ml-auto flex items-center gap-2">
             {step > 0 && <button type="button" onClick={() => setStep((current) => current - 1)} disabled={submitting} className="flex items-center gap-1.5 rounded-xl border border-slate-700 px-3.5 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 disabled:opacity-50"><ArrowLeft className="h-4 w-4" />Back</button>}
@@ -342,8 +322,8 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
           </div>
         </footer>
       </div>
-    </div>
+    </EditorDialog>
   );
 
-  return createPortal(modal, document.body);
+  return modal;
 };

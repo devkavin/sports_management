@@ -1,3 +1,5 @@
+import { EditorDialog } from '../common/FormPanel';
+import { useFeedback } from '../../context/FeedbackContext';
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
 import { Schedule, User } from '../../types';
@@ -17,6 +19,7 @@ export const EditScheduleAssignmentsModal: React.FC<EditScheduleAssignmentsModal
   onClose,
   onSuccess,
 }) => {
+  const { notify, confirm } = useFeedback();
   const [athleteIds, setAthleteIds] = useState<number[]>([]);
   const [trainerIds, setTrainerIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
@@ -34,7 +37,7 @@ export const EditScheduleAssignmentsModal: React.FC<EditScheduleAssignmentsModal
 
   const save = async () => {
     if (!athleteIds.length) {
-      alert('Select at least one athlete for this schedule.');
+      notify('Select at least one athlete for this schedule.');
       return;
     }
     setSaving(true);
@@ -46,21 +49,21 @@ export const EditScheduleAssignmentsModal: React.FC<EditScheduleAssignmentsModal
       onSuccess();
       onClose();
     } catch (error: any) {
-      alert(`Unable to update assignments: ${error.message}`);
+      notify(`Unable to update assignments: ${error.message}`);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm">
+    <EditorDialog title="Manage schedule assignments" onClose={onClose} busy={saving} dirty={JSON.stringify([athleteIds, trainerIds]) !== JSON.stringify([schedule.athlete_ids || [], schedule.trainer_ids || []])} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
       <div className="my-8 w-full max-w-2xl space-y-4 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-800 pb-4">
           <div>
             <h2 className="text-base font-bold text-white">Manage schedule assignments</h2>
             <p className="mt-1 text-xs text-slate-400">{schedule.name}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">
+          <button type="button" data-editor-dismiss onClick={onClose} className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -76,7 +79,7 @@ export const EditScheduleAssignmentsModal: React.FC<EditScheduleAssignmentsModal
         />
 
         <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
+          <button type="button" data-editor-dismiss onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
           <button
             type="button"
             disabled={saving}
@@ -87,6 +90,6 @@ export const EditScheduleAssignmentsModal: React.FC<EditScheduleAssignmentsModal
           </button>
         </div>
       </div>
-    </div>
+    </EditorDialog>
   );
 };
