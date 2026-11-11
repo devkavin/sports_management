@@ -12,6 +12,7 @@ import { CreateScheduleModal } from '../schedule/CreateScheduleModal';
 import { EditScheduleAssignmentsModal } from '../schedule/EditScheduleAssignmentsModal';
 import { ScheduleSessionModal } from '../schedule/ScheduleSessionModal';
 import { ScheduleCalendar } from '../calendar/ScheduleCalendar';
+import { PerformanceStandards } from './PerformanceStandards';
 import { CoachGraphicalAnalytics } from './CoachGraphicalAnalytics';
 import { BoathouseWeatherWidget } from '../weather/BoathouseWeatherWidget';
 import { TaxonomyTreeManager } from '../taxonomy/TaxonomyTreeManager';
@@ -48,6 +49,7 @@ export const CoachDashboard: React.FC = () => {
   const [benchmarkSplit, setBenchmarkSplit] = useState('');
   const [goldSplit, setGoldSplit] = useState('');
   const [isCreateScheduleOpen, setIsCreateScheduleOpen] = useState(false);
+  const [calendarCreateDate, setCalendarCreateDate] = useState<Date | undefined>();
   const [editingAssignments, setEditingAssignments] = useState<Schedule | null>(null);
   const [sessionModal, setSessionModal] = useState<{ schedule: Schedule; session?: TrainingSession; duplicate?: boolean } | null>(null);
 
@@ -387,7 +389,7 @@ export const CoachDashboard: React.FC = () => {
           schedules={schedules}
           competitions={competitions}
           userRole="coach"
-          onAddSession={() => setIsCreateScheduleOpen(true)}
+          onAddSession={(date) => { setCalendarCreateDate(date); setIsCreateScheduleOpen(true); }}
         />
       )}
 
@@ -563,7 +565,7 @@ export const CoachDashboard: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'conditions' && <div className="space-y-6"><BoathouseWeatherWidget userRole="coach" /><form onSubmit={saveBenchmarks} className="rounded-3xl border border-slate-800 bg-slate-900 p-5"><h3 className="font-extrabold text-white">Club 2k comparison standards</h3><p className="mt-1 text-xs text-slate-400">Optional reference lines for charts. These are club settings—not athlete results.</p><div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><label className="text-xs font-semibold text-slate-300">Benchmark split /500m<input value={benchmarkSplit} onChange={(e) => setBenchmarkSplit(e.target.value)} placeholder="M:SS.s" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label><label className="text-xs font-semibold text-slate-300">Gold standard /500m<input value={goldSplit} onChange={(e) => setGoldSplit(e.target.value)} placeholder="M:SS.s" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label><button disabled={benchmarkSaving} className="self-end rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">{benchmarkSaving ? 'Saving…' : 'Save standards'}</button></div></form></div>}
+      {activeTab === 'conditions' && <div className="space-y-6"><BoathouseWeatherWidget userRole="coach" /><PerformanceStandards exercises={exercisesList} equipment={equipmentList} members={members} schedules={schedules} /><form onSubmit={saveBenchmarks} className="rounded-3xl border border-slate-800 bg-slate-900 p-5"><h3 className="font-extrabold text-white">Legacy 2k chart references</h3><p className="mt-1 text-xs text-slate-400">Optional existing chart references. These do not create or enforce a performance standard; use Performance standards above for requirements.</p><div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><label className="text-xs font-semibold text-slate-300">Benchmark split /500m<input value={benchmarkSplit} onChange={(e) => setBenchmarkSplit(e.target.value)} placeholder="M:SS.s" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label><label className="text-xs font-semibold text-slate-300">Gold standard /500m<input value={goldSplit} onChange={(e) => setGoldSplit(e.target.value)} placeholder="M:SS.s" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label><button disabled={benchmarkSaving} className="self-end rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">{benchmarkSaving ? 'Saving…' : 'Save standards'}</button></div></form></div>}
       {activeTab === 'equipment' && <EquipmentManager items={equipmentList} onRefresh={loadData} />}
       {activeTab === 'exercises' && <ExerciseManager items={exercisesList} equipment={equipmentList} onRefresh={loadData} />}
       {activeTab === 'membership' && <div className="space-y-6"><MembershipManager userRole="coach" onChanged={loadData} /><MembersManager onChanged={loadData} /></div>}
@@ -579,7 +581,8 @@ export const CoachDashboard: React.FC = () => {
       {/* Create Schedule Modal */}
       <CreateScheduleModal
         isOpen={isCreateScheduleOpen}
-        onClose={() => setIsCreateScheduleOpen(false)}
+        initialDate={calendarCreateDate}
+        onClose={() => { setIsCreateScheduleOpen(false); setCalendarCreateDate(undefined); }}
         onSuccess={() => loadData()}
         competitions={competitions}
         exercises={exercisesList}
@@ -604,8 +607,8 @@ export const CoachDashboard: React.FC = () => {
 
       {/* Create Competition Modal */}
       {showCompModal && (
-        <EditorDialog title="Add competition" onClose={() => setShowCompModal(false)} busy={competitionSaving} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+        <EditorDialog title="Add competition" onClose={() => setShowCompModal(false)} busy={competitionSaving} className="w-full max-w-md rounded-3xl outline-none">
+          <div className="min-w-0 w-full bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl [&_input]:min-w-0 [&_select]:min-w-0 space-y-4">
             <h3 className="text-lg font-bold text-white">Add Target Regatta / Competition</h3>
             <form onSubmit={handleCreateCompetition} className="space-y-3">
               <input
@@ -631,7 +634,7 @@ export const CoachDashboard: React.FC = () => {
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white"
                 required
               />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <input
                   type="date"
                   value={compStartDate}
@@ -647,7 +650,7 @@ export const CoachDashboard: React.FC = () => {
                   required
                 />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <button
                   type="button"
                   data-editor-dismiss onClick={() => setShowCompModal(false)}
@@ -670,18 +673,18 @@ export const CoachDashboard: React.FC = () => {
 
       {/* Broadcast Announcement Modal */}
       {showBroadcastModal && (
-        <EditorDialog title="Broadcast announcement" onClose={() => setShowBroadcastModal(false)} busy={broadcasting} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
-          <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-100 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+        <EditorDialog title="Broadcast announcement" onClose={() => setShowBroadcastModal(false)} busy={broadcasting} className="w-full max-w-md rounded-3xl outline-none">
+          <div className="relative min-w-0 w-full bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl [&_input]:min-w-0 [&_select]:min-w-0 text-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="shrink-0 w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
                   <Megaphone className="w-4 h-4" />
                 </div>
                 <h3 className="text-sm font-bold text-white">Broadcast Announcement</h3>
               </div>
               <button
                 data-editor-dismiss aria-label="Close announcement editor" onClick={() => setShowBroadcastModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
+                className="shrink-0 p-1 rounded-lg text-slate-400 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -725,7 +728,7 @@ export const CoachDashboard: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <button
                   type="button"
                   data-editor-dismiss aria-label="Close announcement editor" onClick={() => setShowBroadcastModal(false)}

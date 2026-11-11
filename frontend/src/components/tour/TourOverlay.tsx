@@ -1,10 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { tourPlacement } from '../../lib/tourPlacement';
 import { useTour } from '../../context/TourContext';
 import { Compass, X, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
 
 export const TourOverlay: React.FC = () => {
   const { isActive, activeTour, currentStep, currentStepIndex, nextStep, prevStep, endTour } = useTour();
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const tooltip = useRef<HTMLDivElement>(null);
+  const [cardHeight, setCardHeight] = useState(260);
+  const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight, top: 0, left: 0 }));
+
+  useEffect(() => {
+    const visual = window.visualViewport;
+    const update = () => setViewport({ width: visual?.width || window.innerWidth, height: visual?.height || window.innerHeight, top: visual?.offsetTop || 0, left: visual?.offsetLeft || 0 });
+    update(); window.addEventListener('resize', update); visual?.addEventListener('resize', update); visual?.addEventListener('scroll', update);
+    return () => { window.removeEventListener('resize', update); visual?.removeEventListener('resize', update); visual?.removeEventListener('scroll', update); };
+  }, []);
+  useEffect(() => {
+    if (!isActive || !tooltip.current) return;
+    const element = tooltip.current;
+    const update = () => setCardHeight(element.scrollHeight);
+    update(); const observer = new ResizeObserver(update); observer.observe(element);
+    return () => observer.disconnect();
+  }, [isActive, currentStepIndex, viewport.width, viewport.height]);
 
   useEffect(() => {
     if (!isActive || !currentStep) {
@@ -35,61 +53,13 @@ export const TourOverlay: React.FC = () => {
 
   const isLastStep = currentStepIndex === activeTour.steps.length - 1;
 
-  // Calculate tooltip placement
-  let tooltipStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    zIndex: 9999,
+  const tooltipStyle: React.CSSProperties = {
+    position: 'fixed', zIndex: 9999,
+    ...tourPlacement(viewport, targetRect, currentStep.placement || 'bottom', cardHeight),
+    overflowY: 'auto', overflowWrap: 'anywhere',
   };
-
-  if (targetRect) {
-    const spaceBelow = window.innerHeight - targetRect.bottom;
-    const spaceAbove = targetRect.top;
-    const isMobile = window.innerWidth < 768;
-
-    if (isMobile) {
-      tooltipStyle = {
-        position: 'fixed',
-        bottom: '24px',
-        left: '16px',
-        right: '16px',
-        zIndex: 9999,
-      };
-    } else if (currentStep.placement === 'bottom' && spaceBelow > 220) {
-      tooltipStyle = {
-        position: 'fixed',
-        top: `${targetRect.bottom + 12}px`,
-        left: `${Math.max(16, Math.min(window.innerWidth - 380, targetRect.left))}px`,
-        zIndex: 9999,
-      };
-    } else if (currentStep.placement === 'top' && spaceAbove > 220) {
-      tooltipStyle = {
-        position: 'fixed',
-        bottom: `${window.innerHeight - targetRect.top + 12}px`,
-        left: `${Math.max(16, Math.min(window.innerWidth - 380, targetRect.left))}px`,
-        zIndex: 9999,
-      };
-    } else if (currentStep.placement === 'left') {
-      tooltipStyle = {
-        position: 'fixed',
-        top: `${Math.max(20, targetRect.top)}px`,
-        left: `${Math.max(16, targetRect.left - 360)}px`,
-        zIndex: 9999,
-      };
-    } else {
-      tooltipStyle = {
-        position: 'fixed',
-        top: `${Math.max(20, targetRect.top)}px`,
-        left: `${Math.min(window.innerWidth - 380, targetRect.right + 12)}px`,
-        zIndex: 9999,
-      };
-    }
-  }
-
   return (
-    <div className="fixed inset-0 z-50 pointer-events-auto">
+    <div className="fixed inset-0 z-50 overflow-hidden pointer-events-auto">
       {/* Dimmed backdrop with pulsing border on target */}
       <div 
         className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm transition-all duration-300"
@@ -112,6 +82,7 @@ export const TourOverlay: React.FC = () => {
 
       {/* Tooltip Card */}
       <div 
+        ref={tooltip}
         style={tooltipStyle}
         className="w-full max-w-[360px] bg-slate-900 border border-rowing-500/40 rounded-2xl p-5 shadow-2xl text-slate-100 animate-in fade-in zoom-in-95 duration-200"
       >
@@ -146,8 +117,8 @@ export const TourOverlay: React.FC = () => {
         </p>
 
         {/* Step Progress Dots & Navigation Buttons */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-          <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
+          <div className="flex flex-wrap items-center gap-1.5">
             {activeTour.steps.map((_, i) => (
               <span
                 key={i}

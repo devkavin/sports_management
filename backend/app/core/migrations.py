@@ -7,6 +7,7 @@ from sqlalchemy import text, inspect
 from app.core.database import Base, engine, run_additive_migrations
 from app.models import models  # noqa: F401
 from app.models import operations  # noqa: F401
+from app.models.standards import PerformanceStandard
 
 
 def _baseline():
@@ -42,7 +43,12 @@ def _reservation_snapshots():
         connection.commit()
 
 
-MIGRATIONS = [("0001_baseline", _baseline), ("0002_club_workflows", _workflows), ("0003_reservation_snapshots", _reservation_snapshots)]
+def _performance_standards():
+    # Only this new table; no legacy chart-reference conversion or data changes.
+    PerformanceStandard.__table__.create(bind=engine, checkfirst=True)
+
+
+MIGRATIONS = [("0001_baseline", _baseline), ("0002_club_workflows", _workflows), ("0003_reservation_snapshots", _reservation_snapshots), ("0004_performance_standards", _performance_standards)]
 
 
 def run_migrations():

@@ -156,10 +156,10 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
   };
 
   return (
-    <EditorDialog title="Record workout performance" onClose={onClose} busy={submitting} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-100 animate-in fade-in zoom-in-95 duration-150 my-8">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-          <div>
+    <EditorDialog title="Record workout performance" onClose={onClose} busy={submitting} className="w-full max-w-lg rounded-3xl outline-none">
+      <div className="relative min-w-0 w-full bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl text-slate-100 animate-in fade-in zoom-in-95 duration-150 [&_input]:min-w-0 [&_select]:min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-slate-800">
+          <div className="min-w-0 flex-1 basis-48 break-words">
             <span className="text-xs font-bold text-rowing-400 uppercase tracking-wider">
               {initialSession ? `Session: ${initialSession.title}` : 'Dock / Boathouse Log'}
             </span>
@@ -169,7 +169,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
           </div>
 
           {selectedPrescription && (
-            <div className="rounded-xl border border-rowing-500/20 bg-rowing-500/5 p-3 text-xs text-slate-300">
+            <div className="order-last w-full rounded-xl border border-rowing-500/20 bg-rowing-500/5 p-3 text-xs text-slate-300">
               <p className="mb-1 font-bold uppercase tracking-wide text-rowing-300">Coach prescription — reference only</p>
               <p>
                 {selectedPrescription.sets > 1 ? `${selectedPrescription.sets} sets` : '1 set'}
@@ -182,8 +182,8 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
             </div>
           )}
           <button
-            data-editor-dismiss onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            type="button" aria-label="Close performance editor" data-editor-dismiss onClick={onClose}
+            className="shrink-0 p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -238,7 +238,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
                   value={timeMin}
                   onChange={(e) => setTimeMin(e.target.value)}
                   placeholder="06"
-                  className="w-16 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-center text-white font-mono focus:outline-none focus:ring-2 focus:ring-rowing-500"
+                  className="min-w-0 w-16 flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-center text-white font-mono focus:outline-none focus:ring-2 focus:ring-rowing-500"
                   required
                 />
                 <span className="text-slate-500 font-bold">:</span>
@@ -247,7 +247,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
                   value={timeSec}
                   onChange={(e) => setTimeSec(e.target.value)}
                   placeholder="40.0"
-                  className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-center text-white font-mono focus:outline-none focus:ring-2 focus:ring-rowing-500"
+                  className="min-w-0 w-24 flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-center text-white font-mono focus:outline-none focus:ring-2 focus:ring-rowing-500"
                   required
                 />
               </div>
@@ -255,7 +255,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
           </div>}
 
           {/* Instant Computed Split & Power Display Cards */}
-          {isRowing && <div className={`grid gap-3 p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 ${isErg ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {isRowing && <div className={`grid gap-3 p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 ${isErg ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-rowing-500/10 text-rowing-400 flex items-center justify-center shrink-0">
                 <Clock className="w-5 h-5" />
@@ -357,7 +357,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
                 <option value="">Select effort</option>
                 {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => <option key={value} value={value}>{rpeLabels[value] || `${value}/10 Effort`}</option>)}
               </select>
-              <span className="text-[10px] text-slate-400 font-medium truncate block">
+              <span className="text-[10px] text-slate-400 font-medium block">
                 {typeof rpe === 'number' ? (rpeLabels[rpe] || `${rpe}/10 Effort`) : 'Required for session-load analytics'}
               </span>
             </div>
@@ -378,7 +378,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
           </div>
 
           {/* Submit Action */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
+          <div className="pt-3 flex flex-wrap items-center justify-end gap-3 border-t border-slate-800">
             <button
               type="button"
               data-editor-dismiss onClick={onClose}
@@ -389,7 +389,7 @@ export const LogPerformanceModal: React.FC<LogPerformanceModalProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-rowing-600 to-rowing-500 hover:from-rowing-500 hover:to-rowing-400 rounded-xl shadow-lg shadow-rowing-500/25 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="min-w-0 w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-rowing-600 to-rowing-500 hover:from-rowing-500 hover:to-rowing-400 rounded-xl shadow-lg shadow-rowing-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {submitting ? 'Submitting...' : 'Save & Submit for Verification'}
               <CheckCircle2 className="w-4 h-4" />

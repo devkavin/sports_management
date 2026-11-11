@@ -6,6 +6,7 @@ import {
   AvailabilityConflict, AvailabilityStatus
 } from '../types';
 import { requestFailureMessage } from '../lib/formUx';
+import type { PerformanceStandard, StandardInput, StandardEvaluation } from '../types/standards';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -136,6 +137,12 @@ class ApiService {
   }
 
   // Club & Members
+  async getStandards(): Promise<PerformanceStandard[]> { return this.request('/standards'); }
+  async createStandard(data: StandardInput): Promise<PerformanceStandard> { return this.request('/standards', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateStandard(id: number, data: StandardInput & { version: number }): Promise<PerformanceStandard> { return this.request(`/standards/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
+  async archiveStandard(id: number, archived: boolean, version: number): Promise<PerformanceStandard> { return this.request(`/standards/${id}/archive`, { method: 'POST', body: JSON.stringify({ archived, version }) }); }
+  async evaluateStandard(id: number): Promise<StandardEvaluation[]> { return this.request(`/standards/${id}/evaluations`); }
+
   async operation<T>(path: string, method = 'GET', data?: unknown): Promise<T> {
     return this.request<T>('/operations' + path, { method, ...(data !== undefined ? { body: JSON.stringify(data) } : {}) });
   }

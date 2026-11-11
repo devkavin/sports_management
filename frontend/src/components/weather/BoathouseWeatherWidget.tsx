@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { BoathouseCondition, SafetyFlagStatus } from '../../types';
 import { AlertTriangle, Edit3, ShieldCheck, ShieldAlert, X } from 'lucide-react';
+import { EditorDialog } from '../common/FormPanel';
 
 interface Props { userRole?: string; onConditionUpdated?: () => void; }
 const field = 'mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white';
@@ -93,14 +94,13 @@ export const BoathouseWeatherWidget: React.FC<Props> = ({ userRole, onConditionU
       <p className="whitespace-pre-wrap text-sm text-slate-200">{condition?.safety_notes || 'No club instructions reported.'}</p>
       {error && <button type="button" onClick={fetchConditions} className="text-xs font-bold underline">Retry refresh</button>}
     </section>
-    {isModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-3 backdrop-blur-sm">
-      <section role="dialog" aria-modal="true" aria-labelledby="safety-report-title" className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 p-5"><div><h3 id="safety-report-title" className="font-extrabold">Publish observed conditions</h3><p className="mt-1 text-xs text-slate-400">Leave unmeasured values empty. Confirm the safety flag.</p></div><button type="button" aria-label="Close safety report" onClick={() => setIsModalOpen(false)} className="rounded-lg p-2 hover:bg-slate-800"><X className="h-5 w-5" /></button></header>
-        <form onSubmit={handleUpdate} className="overflow-y-auto p-5">
+    {isModalOpen && <EditorDialog title="Publish observed conditions" onClose={() => setIsModalOpen(false)} busy={submitting} className="flex w-full max-w-lg flex-col rounded-3xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-800 p-3 sm:p-5"><div><h3 id="safety-report-title" className="font-extrabold">Publish observed conditions</h3><p className="mt-1 text-xs text-slate-400">Leave unmeasured values empty. Confirm the safety flag.</p></div><button type="button" data-editor-dismiss disabled={submitting} aria-label="Close safety report" className="shrink-0 rounded-lg p-2 hover:bg-slate-800"><X className="h-5 w-5" /></button></header>
+        <form onSubmit={handleUpdate} className="min-h-16 flex-1 overflow-y-auto p-3 sm:p-5">
           <fieldset disabled={submitting} className="space-y-4">
             {saveError && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-200">{saveError}</p>}
             <label className="block text-xs font-semibold">Safety flag<select required value={flag} onChange={(event) => setFlag(event.target.value as SafetyFlagStatus | '')} className={field}><option value="">Select the current flag</option><option value="green">Green</option><option value="amber">Amber</option><option value="red">Red</option></select></label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold">Wind speed (knots)<input type="number" min="0" step="any" value={wind} onChange={(event) => setWind(event.target.value)} className={field} /></label>
               <label className="text-xs font-semibold">Wind direction<input maxLength={64} value={direction} onChange={(event) => setDirection(event.target.value)} className={field} /></label>
               <label className="text-xs font-semibold">Water temperature (°C)<input type="number" step="any" value={water} onChange={(event) => setWater(event.target.value)} className={field} /></label>
@@ -110,10 +110,9 @@ export const BoathouseWeatherWidget: React.FC<Props> = ({ userRole, onConditionU
             <label className="block text-xs font-semibold">Club restrictions and instructions<textarea rows={3} maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)} className={field} /></label>
             <label className="block text-xs font-semibold">Report validity<select value={validHours} onChange={(event) => setValidHours(Number(event.target.value))} className={field}>{[1, 3, 6, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} {hours === 1 ? 'hour' : 'hours'}</option>)}</select></label>
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={broadcast} onChange={(event) => setBroadcast(event.target.checked)} />Notify club members in the app</label>
-            <div className="flex justify-end gap-2 border-t border-slate-800 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="rounded-xl px-4 py-2 text-sm text-slate-400">Cancel</button><button type="submit" className="rounded-xl bg-rowing-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40" disabled={submitting || !flag}>{submitting ? 'Publishing…' : 'Publish report'}</button></div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-4"><button type="button" data-editor-dismiss className="rounded-xl px-4 py-2 text-sm text-slate-400">Cancel</button><button type="submit" className="rounded-xl bg-rowing-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40" disabled={submitting || !flag}>{submitting ? 'Publishing…' : 'Publish report'}</button></div>
           </fieldset>
         </form>
-      </section>
-    </div>}
+    </EditorDialog>}
   </>;
 };

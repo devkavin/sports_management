@@ -117,14 +117,14 @@ export const ScheduleSessionModal: React.FC<ScheduleSessionModalProps> = ({
   };
 
   return (
-    <EditorDialog title={duplicate ? 'Duplicate session' : session ? 'Edit session' : 'Add session'} onClose={onClose} busy={saving} dirty={JSON.stringify(draft) !== JSON.stringify(initialDraft)} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
-      <div  aria-labelledby="schedule-session-title" className="mx-auto grid h-[100dvh] w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-slate-900 text-slate-100 shadow-2xl sm:my-[4dvh] sm:h-[92dvh] sm:max-h-[850px] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-slate-800">
+    <EditorDialog title={duplicate ? 'Duplicate session' : session ? 'Edit session' : 'Add session'} onClose={onClose} busy={saving} dirty={JSON.stringify(draft) !== JSON.stringify(initialDraft)} className="w-full max-w-4xl rounded-3xl outline-none">
+      <div  aria-labelledby="schedule-session-title" className="mx-auto grid h-[min(var(--dialog-available-height),850px)] min-h-0 min-w-0 w-full grid-rows-[auto_minmax(4rem,1fr)] rounded-3xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl [&_input]:min-w-0 [&_select]:min-w-0">
         <header className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300"><CalendarPlus className="h-4 w-4" /></span>
             <div className="min-w-0"><h2 id="schedule-session-title" className="truncate text-sm font-bold text-white">{duplicate ? 'Duplicate session' : session ? 'Edit session' : 'Add session'}</h2><p className="truncate text-xs text-slate-400">{schedule.name}</p></div>
           </div>
-          <button type="button" data-editor-dismiss onClick={onClose} disabled={saving} aria-label="Close session editor" className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50"><X className="h-5 w-5" /></button>
+          <button type="button" data-editor-dismiss onClick={onClose} disabled={saving} aria-label="Close session editor" className="shrink-0 rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50"><X className="h-5 w-5" /></button>
         </header>
         <main className="min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6">
           {session && !duplicate && <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">To change the time or duration, reschedule with a reason so participants are notified and boat bookings stay in sync.<button type="button" className="mt-2 block rounded-lg bg-sky-600 px-3 py-2 font-bold text-white" onClick={() => navigate(`operations/${session.id}`)}>Open rescheduling & attendance</button></div>}

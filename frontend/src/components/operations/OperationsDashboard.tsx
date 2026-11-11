@@ -1,12 +1,15 @@
 import { filterSelectedOptions } from '../../lib/formUx';
 import { useFeedback } from '../../context/FeedbackContext';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '../../context/NavigationContext';
 import { Equipment, User } from '../../types';
 import { AttendanceRow, BoatReservation, ClubSession, DamageRecord, EmailDelivery, OutingRecord, SavedCrew } from '../../types/operations';
-import { Field, Panel, FormModal, inputClass, buttonClass, smallButtonClass, dateText, utcDate, localInput } from '../common/FormPanel';
+import { Field, Panel, FormModal, EditorDialog, inputClass, buttonClass, smallButtonClass, dateText, utcDate, localInput } from '../common/FormPanel';
+import { AttendanceCalendar, sessionStatusClass } from './AttendanceCalendar';
+import { attendanceTotals, calendarRange, localDateKey, sessionsOnDate } from '../../lib/attendanceCalendar';
 
 const boatSeats: Record<string, string[]> = {
   '1x_single_scull': ['Single'], '2x_double_scull': ['Bow', 'Stroke'], '2-_pair': ['Bow', 'Stroke'],
@@ -31,6 +34,16 @@ export const OperationsDashboard: React.FC = () => {
   const [deliveries, setDeliveries] = useState<EmailDelivery | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(destination.target || null);
   const [register, setRegister] = useState<AttendanceRow[]>([]);
+  const [attendanceLoadedId, setAttendanceLoadedId] = useState<number | null>(null);
+  const [attendanceError, setAttendanceError] = useState('');
+  const attendanceRequest = useRef(0);
+  const [sessionView, setSessionView] = useState<'calendar' | 'list'>(manager && !destination.target ? 'calendar' : 'list');
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarSessions, setCalendarSessions] = useState<ClubSession[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(true);
+  const [calendarError, setCalendarError] = useState('');
+  const [calendarRevision, setCalendarRevision] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
   const [search, setSearch] = useState('');
@@ -60,7 +73,8 @@ export const OperationsDashboard: React.FC = () => {
   const [newDate, setNewDate] = useState('');
   const [duration, setDuration] = useState(60);
   const [rsvpNote, setRsvpNote] = useState('');
-  const selected = sessions.find((session) => session.id === selectedId);
+  const selected = (sessionView === 'calendar' ? calendarSessions.find(session => session.id === selectedId) : undefined)
+    || sessions.find((session) => session.id === selectedId) || calendarSessions.find((session) => session.id === selectedId);
   const boats = equipment.filter((item) => boatSeats[item.category]);
   const athletes = members.filter((member) => member.role === 'athlete' && member.is_active);
 
@@ -71,27 +85,60 @@ export const OperationsDashboard: React.FC = () => {
       api.operation<OutingRecord[]>('/outings'), api.getEquipment(), staff ? api.getClubMembers() : Promise.resolve([]),
     ]);
     setSessions(sessionRows); setCrewList(crews); setBookings(reservations); setDamage(damages); setOutings(outingRows); setEquipment(items); setMembers(people);
-    if (selectedId == null) setSelectedId(sessionRows.filter((session) => utcDate(session.session_date) > new Date() && session.status === 'scheduled').sort((a, b) => a.session_date.localeCompare(b.session_date))[0]?.id || sessionRows[0]?.id || null);
+    if (selectedRef.current == null && sessionView === 'list') setSelectedId(sessionRows.filter((session) => utcDate(session.session_date) > new Date() && session.status === 'scheduled').sort((a, b) => a.session_date.localeCompare(b.session_date))[0]?.id || sessionRows[0]?.id || null);
     if (user?.role === 'admin') setDeliveries(await api.operation<EmailDelivery>('/communications'));
   };
   const loadAttendance = async (id: number) => {
-    const rows = await api.operation<AttendanceRow[]>(`/sessions/${id}/attendance`);
-    if (selectedRef.current !== id) return;
-    setRegister(rows);
-    setRsvpNote(rows.find((row) => row.user_id === user?.id)?.note || '');
+    const request = ++attendanceRequest.current;
+    setAttendanceError(''); setAttendanceLoadedId(null);
+    try {
+      const rows = await api.operation<AttendanceRow[]>(`/sessions/${id}/attendance`);
+      if (selectedRef.current !== id || request !== attendanceRequest.current) return;
+      setRegister(rows); setAttendanceLoadedId(id);
+      setRsvpNote(rows.find((row) => row.user_id === user?.id)?.note || '');
+    } catch (err: any) {
+      if (selectedRef.current === id && request === attendanceRequest.current) setAttendanceError(err.message);
+    }
   };
   useEffect(() => { load().catch((err) => setError(err.message)).finally(() => setLoading(false)); }, []);
-  useEffect(() => { if (destination.target) { setSelectedId(destination.target); setTab('sessions'); } }, [destination.revision]);
-  useEffect(() => { setRegister([]); if (selectedId) loadAttendance(selectedId).catch((err) => setError(err.message)); }, [selectedId]);
+  useEffect(() => { if (destination.target) { setSelectedId(destination.target); setTab('sessions'); setSessionView('list'); setSelectedDate(null); } }, [destination.revision]);
+  useEffect(() => { setRegister([]); if (selectedId) void loadAttendance(selectedId); }, [selectedId]);
+  const monthKey = localDateKey(calendarMonth).slice(0, 7);
+  useEffect(() => {
+    if (!manager || sessionView !== 'calendar' || tab !== 'sessions') return;
+    let active = true;
+    setCalendarLoading(true); setCalendarError(''); setCalendarSessions([]);
+    const query = new URLSearchParams(calendarRange(calendarMonth));
+    api.operation<ClubSession[]>(`/sessions?${query}`).then(rows => {
+      if (active) setCalendarSessions(rows);
+    }).catch(err => { if (active) setCalendarError(err.message); })
+      .finally(() => { if (active) setCalendarLoading(false); });
+    return () => { active = false; };
+  }, [monthKey, calendarRevision, manager, sessionView, tab]);
   const run = async (work: () => Promise<void>, success: string, question?: { title: string; message: string; confirmLabel?: string; danger?: boolean }) => {
     if (actionPending.current) return;
     actionPending.current = true;
     setBusy(true); setError(''); setMessage('');
-    try { if (question && !await confirm(question)) return; await work(); await load(); if (selectedId) await loadAttendance(selectedId); setMessage(success); }
+    try { if (question && !await confirm(question)) return; await work(); await load(); setCalendarRevision(value => value + 1); if (selectedId) await loadAttendance(selectedId); setMessage(success); }
     catch (err: any) { setError(err.message); notify(err.message); } finally { setBusy(false); actionPending.current = false; }
   };
   const visibleSessions = useMemo(() => sessions.filter((session) => (session.title + ' ' + session.status).toLowerCase().includes(search.toLowerCase())), [sessions, search]);
+  const visibleCalendarSessions = useMemo(() => calendarSessions.filter(session => (session.title + ' ' + session.status).toLowerCase().includes(search.toLowerCase())), [calendarSessions, search]);
+  const daySessions = selectedDate ? sessionsOnDate(visibleCalendarSessions, selectedDate) : [];
+  const totals = attendanceTotals(register);
   const names = (crew: SavedCrew) => Object.entries(crew.seats).map(([seat, id]) => seat + ': ' + (crew.seat_names?.[seat] || members.find((member) => member.id === id)?.full_name || (id === user?.id ? user.full_name : 'Club athlete'))).join(' · ');
+
+  const sessionPanel = <Panel title={selected?.title || 'Session register'}>{selected ? <>
+          <p className="text-sm text-slate-300">{dateText(selected.session_date)} · {selected.duration_minutes} minutes · <span className="font-bold capitalize">{selected.status}</span></p>{selected.change_reason && <p className="text-xs text-amber-200">Last change: {selected.change_reason}</p>}
+          {selected.location && <p className="text-sm text-slate-300">Location: {selected.location}</p>}
+          {manager && <div className="flex flex-wrap gap-2">{(selected.status === 'cancelled' ? [['restore', 'Restore session']] : selected.status === 'scheduled' ? [['reschedule', 'Reschedule'], ['cancel', 'Cancel session'], ...(utcDate(selected.session_date) <= new Date() ? [['complete', 'Mark completed']] : [])] : []).map(([action, label]) => <button type="button" key={action} disabled={busy} className={smallButtonClass} onClick={() => { setLifecycle(action); setReason(''); setNewDate(localInput(selected.session_date)); setDuration(selected.duration_minutes); }}>{label}</button>)}</div>}
+          <p className="text-xs text-slate-400">RSVP records expected attendance. Staff check-in records what happened. Exercise results are kept separately.</p>
+          {!staff && selected.status === 'scheduled' && utcDate(selected.session_date) > new Date() && <div className="space-y-3"><Field label="Note for your coach (optional)"><input value={rsvpNote} onChange={(event) => setRsvpNote(event.target.value)} maxLength={1000} className={inputClass} /></Field><div className="flex flex-wrap gap-2">{[['going', 'Going'], ['maybe', 'Maybe'], ['declined', 'Cannot attend']].map(([value, label]) => <button key={value} disabled={busy} className={buttonClass} onClick={() => run(async () => { await api.operation(`/sessions/${selected.id}/rsvp`, 'PUT', { rsvp: value, note: rsvpNote || null }); }, 'Your RSVP was saved.')}>{label}</button>)}</div></div>}
+          {attendanceError ? <div role="alert" className="space-y-2 text-sm text-rose-200"><p>{attendanceError}</p><button type="button" className={smallButtonClass} onClick={() => void loadAttendance(selected.id)}>Retry attendance</button></div> : attendanceLoadedId !== selected.id ? <p role="status" className="text-sm text-slate-400">Loading attendance…</p> : <>
+            {staff && <dl aria-label="Attendance summary" className="grid grid-cols-2 gap-2 sm:grid-cols-3">{Object.entries(totals).map(([key, value]) => <div key={key} className="rounded-xl border border-slate-800 bg-slate-950 p-3"><dt className="text-xs capitalize text-slate-400">{key.replace('_', ' ')}</dt><dd className="mt-1 text-lg font-bold text-white">{value}</dd></div>)}</dl>}
+            <div className="space-y-2">{register.map((row) => <div key={row.user_id} className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0 break-words"><h4 className="text-sm font-bold text-white">{row.name}</h4><p className="text-xs text-slate-400">RSVP: {row.rsvp} · Attendance: {row.checkin?.replace('_', ' ') || 'Not recorded'}</p>{row.note && <p className="mt-1 text-xs text-slate-300">{row.note}</p>}</div>{staff && <Field label={'Attendance for ' + row.name}><select disabled={busy || selected.status === 'cancelled'} value={row.checkin || ''} onChange={(event) => run(async () => { await api.operation(`/sessions/${selected.id}/attendance/${row.user_id}`, 'PUT', { checkin: event.target.value || null }); }, 'Attendance saved.')} className={inputClass}><option value="">Not recorded</option>{[['present', 'Present'], ['absent', 'Absent'], ['excused', 'Excused'], ['no_show', 'No show']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>}</div>)}{!register.length && <p className="text-sm text-slate-400">No active athletes assigned to this session.</p>}</div>
+          </>}
+        </> : <p className="text-sm text-slate-400">Choose a session to view its register.</p>}</Panel>;
 
   return <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
     <div><h2 className="text-2xl font-extrabold text-white">Club operations</h2><p className="mt-1 text-sm text-slate-400">Attendance, crews, boat bookings, repairs and outings in one place.</p></div>
@@ -99,14 +146,17 @@ export const OperationsDashboard: React.FC = () => {
     {message && <p role="status" className="rounded-xl bg-emerald-500/10 p-3 text-sm text-emerald-200">{message}</p>}
     <nav aria-label="Club operations" className="flex gap-2 overflow-x-auto pb-2">{[['sessions', 'Sessions & attendance'], ['crews', 'Saved crews'], ['bookings', 'Boat reservations'], ['damage', 'Damage & repairs'], ['outings', 'Launch / return'], ...(user?.role === 'admin' ? [['delivery', 'Email delivery']] : [])].map(([value, label]) => <button key={value} type="button" onClick={() => setTab(value)} aria-current={tab === value ? 'page' : undefined} className={'shrink-0 rounded-xl px-4 py-2 text-xs font-bold ' + (tab === value ? 'bg-rowing-500/20 text-rowing-200' : 'bg-slate-900 text-slate-400')}>{label}</button>)}</nav>
     {loading && <p className="text-sm text-slate-400">Loading club records…</p>}
-    {tab === 'sessions' && <div className="grid items-start gap-5 lg:grid-cols-[minmax(230px,1fr)_2fr]"><Panel title="Choose a session"><Field label="Search title or status"><input value={search} onChange={(event) => setSearch(event.target.value)} className={inputClass} placeholder="Search sessions" /></Field><div className="max-h-[60vh] space-y-2 overflow-y-auto">{visibleSessions.map((session) => <button type="button" key={session.id} onClick={() => setSelectedId(session.id)} className={'block w-full rounded-xl border p-3 text-left ' + (selectedId === session.id ? 'border-rowing-400 bg-rowing-500/10' : 'border-slate-800 bg-slate-950')}><span className="block text-sm font-bold text-white">{session.title}</span><span className="mt-1 block text-xs text-slate-400">{dateText(session.session_date)} · {session.status}</span></button>)}{!visibleSessions.length && <p className="text-sm text-slate-400">No assigned sessions match.</p>}</div></Panel>
-      <Panel title={selected?.title || 'Session register'}>{selected ? <>
-        <p className="text-sm text-slate-300">{dateText(selected.session_date)} · {selected.duration_minutes} minutes · <span className="font-bold capitalize">{selected.status}</span></p>{selected.change_reason && <p className="text-xs text-amber-200">Last change: {selected.change_reason}</p>}
-        {manager && <div className="flex flex-wrap gap-2">{(selected.status === 'cancelled' ? [['restore', 'Restore session']] : selected.status === 'scheduled' ? [['reschedule', 'Reschedule'], ['cancel', 'Cancel session'], ...(utcDate(selected.session_date) <= new Date() ? [['complete', 'Mark completed']] : [])] : []).map(([action, label]) => <button type="button" key={action} disabled={busy} className={smallButtonClass} onClick={() => { setLifecycle(action); setReason(''); setNewDate(localInput(selected.session_date)); setDuration(selected.duration_minutes); }}>{label}</button>)}</div>}
-        <p className="text-xs text-slate-400">RSVP records expected attendance. Staff check-in records what happened. Exercise results are kept separately.</p>
-        {!staff && selected.status === 'scheduled' && utcDate(selected.session_date) > new Date() && <div className="space-y-3"><Field label="Note for your coach (optional)"><input value={rsvpNote} onChange={(event) => setRsvpNote(event.target.value)} maxLength={1000} className={inputClass} /></Field><div className="flex flex-wrap gap-2">{[['going', 'Going'], ['maybe', 'Maybe'], ['declined', 'Cannot attend']].map(([value, label]) => <button key={value} disabled={busy} className={buttonClass} onClick={() => run(async () => { await api.operation(`/sessions/${selected.id}/rsvp`, 'PUT', { rsvp: value, note: rsvpNote || null }); }, 'Your RSVP was saved.')}>{label}</button>)}</div></div>}
-        <div className="space-y-2">{register.map((row) => <div key={row.user_id} className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 sm:flex-row sm:items-center sm:justify-between"><div><h4 className="text-sm font-bold text-white">{row.name}</h4><p className="text-xs text-slate-400">RSVP: {row.rsvp} · Attendance: {row.checkin?.replace('_', ' ') || 'Not recorded'}</p>{row.note && <p className="mt-1 text-xs text-slate-300">{row.note}</p>}</div>{staff && <Field label={'Attendance for ' + row.name}><select disabled={busy || selected.status === 'cancelled'} value={row.checkin || ''} onChange={(event) => run(async () => { await api.operation(`/sessions/${selected.id}/attendance/${row.user_id}`, 'PUT', { checkin: event.target.value || null }); }, 'Attendance saved.')} className={inputClass}><option value="">Not recorded</option>{[['present', 'Present'], ['absent', 'Absent'], ['excused', 'Excused'], ['no_show', 'No show']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>}</div>)}{!register.length && <p className="text-sm text-slate-400">No active athletes assigned to this session.</p>}</div>
-      </> : <p className="text-sm text-slate-400">Choose a session to view its register.</p>}</Panel></div>}
+    {tab === 'sessions' && manager && <div className="flex flex-wrap items-end justify-between gap-3"><div role="group" aria-label="Sessions display" className="flex gap-2">{(['calendar', 'list'] as const).map(view => <button key={view} type="button" disabled={busy} aria-pressed={sessionView === view} onClick={() => { setSessionView(view); setSelectedDate(null); }} className={smallButtonClass + (sessionView === view ? ' border-rowing-400 bg-rowing-500/20 text-white' : '')}>{view === 'calendar' ? 'Calendar view' : 'List view'}</button>)}</div><div className="w-full sm:w-72"><Field label="Search session title or status"><input type="search" value={search} onChange={event => setSearch(event.target.value)} className={inputClass} placeholder="Search sessions" /></Field></div></div>}
+    {tab === 'sessions' && manager && sessionView === 'calendar' && <AttendanceCalendar month={calendarMonth} sessions={visibleCalendarSessions} selectedDate={selectedDate} loading={calendarLoading} error={calendarError} onRetry={() => setCalendarRevision(value => value + 1)} onMonthChange={month => { if (!busy) { setCalendarMonth(month); setSelectedDate(null); } }} onSelectDate={key => { if (busy) return; setSelectedDate(key); setSelectedId(sessionsOnDate(visibleCalendarSessions, key)[0]?.id ?? null); setMessage(''); setError(''); }} />}
+    {tab === 'sessions' && (!manager || sessionView === 'list') && <div className="grid items-start gap-5 lg:grid-cols-[minmax(230px,1fr)_2fr]"><Panel title="Choose a session">{!manager && <Field label="Search title or status"><input value={search} onChange={(event) => setSearch(event.target.value)} className={inputClass} placeholder="Search sessions" /></Field>}<div className="max-h-[60vh] space-y-2 overflow-y-auto">{visibleSessions.map((session) => <button type="button" disabled={busy} key={session.id} onClick={() => setSelectedId(session.id)} className={'block w-full rounded-xl border p-3 text-left ' + (selectedId === session.id ? 'border-rowing-400 bg-rowing-500/10' : 'border-slate-800 bg-slate-950')}><span className="block text-sm font-bold text-white">{session.title}</span><span className="mt-1 block text-xs text-slate-400">{dateText(session.session_date)} · {session.status}</span></button>)}{!visibleSessions.length && <p className="text-sm text-slate-400">No assigned sessions match.</p>}</div></Panel>
+      {sessionPanel}</div>}
+    {manager && selectedDate && <EditorDialog title={'Sessions & attendance · ' + new Date(selectedDate + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} dirty={false} busy={busy} onClose={() => setSelectedDate(null)} className="flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl outline-none">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 p-4 sm:p-5"><div><h2 className="font-bold text-white">{new Date(selectedDate + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h2><p className="text-xs text-slate-400">Sessions & attendance · {daySessions.length} session{daySessions.length === 1 ? '' : 's'}{search ? ' matching your search' : ''}</p></div><button type="button" data-editor-dismiss disabled={busy} aria-label="Close date details" className="rounded-lg p-2 text-slate-300 hover:bg-slate-800 disabled:opacity-40"><X className="h-5 w-5" /></button></header>
+      <div className="min-h-16 space-y-4 overflow-y-auto p-3 sm:p-5">
+        {error && <p role="alert" className="text-sm text-rose-200">{error}</p>}{message && <p role="status" className="text-sm text-emerald-200">{message}</p>}
+        {calendarError ? <p role="alert" className="text-sm text-rose-200">{calendarError} <button type="button" className={smallButtonClass} onClick={() => setCalendarRevision(value => value + 1)}>Retry calendar</button></p> : calendarLoading ? <p role="status" className="text-sm text-slate-400">Refreshing sessions…</p> : daySessions.length ? <div className="grid items-start gap-4 lg:grid-cols-[minmax(200px,1fr)_2fr]"><nav aria-label="Sessions on selected date" className="space-y-2">{daySessions.map(session => <button key={session.id} type="button" disabled={busy} aria-pressed={selectedId === session.id} onClick={() => { setSelectedId(session.id); setMessage(''); setError(''); }} className={'block w-full space-y-1 rounded-xl border p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-rowing-400 ' + (selectedId === session.id ? 'border-rowing-400 bg-rowing-500/10' : 'border-slate-700 bg-slate-950')}><span className="block break-words text-sm font-bold text-white">{session.title}</span><span className="block text-xs text-slate-400">{utcDate(session.session_date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} · {session.duration_minutes} minutes</span><span className={'inline-block rounded border px-2 py-0.5 text-xs capitalize ' + sessionStatusClass(session.status)}>{session.status}</span></button>)}</nav><div className="min-w-0">{daySessions.some(session => session.id === selectedId) ? sessionPanel : <p className="text-sm text-slate-300">Choose a session to view its attendance. Updated sessions may have moved to another date.</p>}</div></div> : <p className="rounded-xl border border-slate-800 p-6 text-center text-sm text-slate-400">{search ? 'No sessions match your search on this date.' : 'No sessions scheduled on this date.'}</p>}
+      </div>
+    </EditorDialog>}
     {tab === 'crews' && <Panel title="Saved crews">{manager && <button className={buttonClass} onClick={() => { setCrewEditor({ name: '', equipment_id: 0, seats: {} }); setAthleteSearch(''); setBoatSearch(''); }}>Create crew</button>}<div className="grid gap-3 md:grid-cols-2">{crewList.map((crew) => <article key={crew.id} className="space-y-2 rounded-xl border border-slate-800 p-4"><h4 className="font-bold text-white">{crew.name}</h4><p className="text-xs text-slate-400">{equipment.find((item) => item.id === crew.equipment_id)?.name || 'Boat'}</p><p className="text-xs text-slate-300">{names(crew)}</p>{manager && <button className={smallButtonClass} onClick={() => { setCrewEditor({ ...crew, seats: { ...crew.seats } }); setAthleteSearch(''); setBoatSearch(''); }}>Edit crew</button>}</article>)}</div>{!crewList.length && <p className="text-sm text-slate-400">No saved crews yet. A coach creates a crew using the club's real boats and athletes.</p>}</Panel>}
     {tab === 'bookings' && <Panel title="Boat reservations">{staff && <button className={buttonClass} onClick={() => { setBookingForm(true); setBookingCrewSearch(''); setBookingSessionSearch(''); setBookingCrew(''); setBookingSession(''); setStarts(''); setEnds(''); }}>Reserve a boat</button>}<div className="space-y-3">{bookings.map((booking) => <article key={booking.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-800 p-4 sm:flex-row"><div><h4 className="font-bold text-white">{booking.equipment_name} · {booking.crew_name}</h4><p className="text-xs text-slate-400">{dateText(booking.starts_at)} → {dateText(booking.ends_at)}</p><p className="mt-1 text-xs capitalize text-slate-300">{booking.status}</p></div>{staff && booking.status === 'booked' && <button disabled={busy} className={smallButtonClass} onClick={() => run(async () => { await api.operation(`/reservations/${booking.id}/cancel`, 'POST'); }, 'Reservation cancelled.', { title: 'Cancel boat reservation?', message: `Release ${booking.equipment_name} for ${booking.crew_name}? The crew will need a new reservation to use this boat.`, confirmLabel: 'Cancel reservation', danger: true })}>Cancel reservation</button>}</article>)}</div>{!bookings.length && <p className="text-sm text-slate-400">No reservations yet.</p>}</Panel>}
     {tab === 'damage' && <Panel title="Damage & repairs"><button className={buttonClass} onClick={() => { setDamageForm(true); setDamageEquipment(''); setDescription(''); setSeverity('advisory'); }}>Report damage</button><div className="space-y-3">{damage.map((record) => <article key={record.id} className="space-y-2 rounded-xl border border-slate-800 p-4"><h4 className="font-bold text-white">{equipment.find((item) => item.id === record.equipment_id)?.name || 'Equipment'} · {record.resolved_at ? 'Resolved' : record.severity}</h4><p className="text-sm text-slate-300">{record.description}</p><p className="text-xs text-slate-400">Reported {dateText(record.created_at)}</p>{record.resolution && <p className="text-xs text-emerald-200">Repair: {record.resolution}</p>}{staff && !record.resolved_at && <button disabled={busy} className={smallButtonClass} onClick={() => { setResolving(record.id); setResolution(''); }}>Record repair / resolve</button>}</article>)}</div>{!damage.length && <p className="text-sm text-slate-400">No damage reports recorded.</p>}</Panel>}

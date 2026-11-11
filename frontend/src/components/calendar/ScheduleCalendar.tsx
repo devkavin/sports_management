@@ -77,7 +77,7 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   // Helper to get sessions on a specific date
   const getSessionsForDate = (date: Date) => {
     return allSessions.filter((s) => {
-      const sDate = new Date(s.session_date);
+      const sDate = utcDate(s.session_date);
       return (
         sDate.getFullYear() === date.getFullYear() &&
         sDate.getMonth() === date.getMonth() &&
@@ -260,7 +260,11 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
               return (
                 <div
                   key={idx}
-                  onClick={() => setSelectedDay(date)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${date.toLocaleDateString()}${(userRole === 'coach' || userRole === 'admin') && onAddSession ? ', add session' : ', view sessions'}`}
+                  onClick={() => { setSelectedDay(date); if (userRole === 'coach' || userRole === 'admin') onAddSession?.(date); }}
+                  onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedDay(date); if (userRole === 'coach' || userRole === 'admin') onAddSession?.(date); } }}
                   className={`min-h-[70px] sm:min-h-[90px] p-1 sm:p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                     isSelected
                       ? 'bg-slate-800/90 border-rowing-400 ring-2 ring-rowing-500/40 shadow-lg'
@@ -341,6 +345,8 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
               })}
             </h4>
           </div>
+
+          {(userRole === 'coach' || userRole === 'admin') && onAddSession && <button type="button" onClick={() => onAddSession(selectedDay)} className="flex items-center justify-center gap-2 rounded-xl bg-rowing-600 px-4 py-3 text-sm font-bold text-white hover:bg-rowing-500"><PlusCircle className="h-4 w-4" />Add session for this date</button>}
 
           {/* Competitions on this day */}
           {selectedDayCompetitions.length > 0 && (

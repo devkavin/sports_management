@@ -301,9 +301,9 @@ export const CoachGraphicalAnalytics: React.FC<CoachGraphicalAnalyticsProps> = (
         {/* Visual Boat Shell Diagram */}
         <div className="relative bg-slate-950/90 border border-slate-800 rounded-3xl p-6 overflow-x-auto">
           <div className="min-w-[600px] flex items-center justify-between gap-3">
-            {/* Bow Point */}
+            {/* Stern Point — beside the stroke seat */}
             <div className="w-12 h-12 bg-gradient-to-l from-slate-800 to-emerald-500/40 rounded-l-full flex items-center justify-center text-[10px] font-black text-emerald-300 border border-emerald-500/30">
-              BOW
+              STERN
             </div>
 
             {/* Interactive Seat Cards */}
@@ -364,9 +364,9 @@ export const CoachGraphicalAnalytics: React.FC<CoachGraphicalAnalyticsProps> = (
               })}
             </div>
 
-            {/* Stern Point */}
+            {/* Bow Point — beside the bow seat */}
             <div className="w-12 h-12 bg-gradient-to-r from-slate-800 to-rowing-500/40 rounded-r-full flex items-center justify-center text-[10px] font-black text-rowing-300 border border-rowing-500/30">
-              STERN
+              BOW
             </div>
           </div>
         </div>

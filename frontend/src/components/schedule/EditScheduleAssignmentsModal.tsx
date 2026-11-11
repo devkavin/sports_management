@@ -56,14 +56,14 @@ export const EditScheduleAssignmentsModal: React.FC<EditScheduleAssignmentsModal
   };
 
   return (
-    <EditorDialog title="Manage schedule assignments" onClose={onClose} busy={saving} dirty={JSON.stringify([athleteIds, trainerIds]) !== JSON.stringify([schedule.athlete_ids || [], schedule.trainer_ids || []])} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
-      <div className="my-8 w-full max-w-2xl space-y-4 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-          <div>
+    <EditorDialog title="Manage schedule assignments" onClose={onClose} busy={saving} dirty={JSON.stringify([athleteIds, trainerIds]) !== JSON.stringify([schedule.athlete_ids || [], schedule.trainer_ids || []])} className="w-full max-w-2xl rounded-3xl outline-none">
+      <div className="min-w-0 w-full space-y-4 rounded-3xl border border-slate-800 bg-slate-900 p-4 sm:p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="min-w-0 break-words">
             <h2 className="text-base font-bold text-white">Manage schedule assignments</h2>
             <p className="mt-1 text-xs text-slate-400">{schedule.name}</p>
           </div>
-          <button type="button" data-editor-dismiss onClick={onClose} className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">
+          <button type="button" data-editor-dismiss aria-label="Close assignments editor" onClick={onClose} className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -78,7 +78,7 @@ export const EditScheduleAssignmentsModal: React.FC<EditScheduleAssignmentsModal
           excludeScheduleId={schedule.id}
         />
 
-        <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-800 pt-4">
           <button type="button" data-editor-dismiss onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
           <button
             type="button"

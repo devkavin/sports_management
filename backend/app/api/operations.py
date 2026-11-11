@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
@@ -23,11 +23,26 @@ def session_out(session):
 
 
 @router.get("/sessions")
-def sessions(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def sessions(user: User = Depends(get_current_user), db: Session = Depends(get_db),
+             starts_at: datetime | None = None, ends_at: datetime | None = None):
+    if (starts_at is None) != (ends_at is None):
+        raise HTTPException(422, "Choose both a calendar start and end date")
+    if starts_at is not None and ends_at is not None:
+        starts_at = starts_at.astimezone(timezone.utc).replace(tzinfo=None) if starts_at.tzinfo else starts_at
+        ends_at = ends_at.astimezone(timezone.utc).replace(tzinfo=None) if ends_at.tzinfo else ends_at
+        # Six local weeks can exceed 42 UTC days across an offset transition.
+        if not timedelta(0) < ends_at - starts_at <= timedelta(days=43):
+            raise HTTPException(422, "Choose an end date after the start, no more than 43 days later")
     query = db.query(TrainingSession).join(Schedule).filter(Schedule.club_id == user.club_id)
     if user.role not in [UserRole.ADMIN, UserRole.COACH]:
         query = query.filter(or_(Schedule.assignments.any(ScheduleAssignment.user_id == user.id), TrainingSession.trainer_id == user.id))
-    return [session_out(item) for item in query.order_by(TrainingSession.session_date.desc()).limit(500).all()]
+    if starts_at is not None:
+        # A bounded calendar window must include every session, including old months.
+        query = query.filter(TrainingSession.session_date >= starts_at, TrainingSession.session_date < ends_at)
+        query = query.order_by(TrainingSession.session_date, TrainingSession.id)
+    else:
+        query = query.order_by(TrainingSession.session_date.desc()).limit(500)
+    return [session_out(item) for item in query.all()]
 
 
 @router.get("/sessions/{session_id}/attendance")

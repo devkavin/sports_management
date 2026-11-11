@@ -22,6 +22,7 @@ import { Competition, Exercise, SchedulePhase, TaxonomyNode, User } from '../../
 import { api } from '../../services/api';
 import { TaxonomySelector } from '../taxonomy/TaxonomySelector';
 import { AssignmentSelector } from './AssignmentSelector';
+import { localDateKey } from '../../lib/attendanceCalendar';
 import { createEmptySessionDraft, expandRecurringSession, SessionDraft, SessionEditorForm, sessionDraftToPayload } from './SessionEditorForm';
 
 interface CreateScheduleModalProps {
@@ -31,6 +32,7 @@ interface CreateScheduleModalProps {
   competitions: Competition[];
   exercises: Exercise[];
   members: User[];
+  initialDate?: Date;
 }
 
 const STEPS = [
@@ -47,10 +49,11 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   competitions,
   exercises,
   members,
+  initialDate: selectedDate,
 }) => {
   const { notify, confirm } = useFeedback();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const initialDate = useRef(new Date().toISOString().split('T')[0]).current;
+  const initialDate = localDateKey(selectedDate || new Date());
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -58,8 +61,8 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   const [phase, setPhase] = useState<SchedulePhase>('base_endurance');
   const [selectedTaxonomyNode, setSelectedTaxonomyNode] = useState<TaxonomyNode | null>(null);
   const [competitionId, setCompetitionId] = useState<number | ''>('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(initialDate);
+  const [endDate, setEndDate] = useState(initialDate);
   const [submitting, setSubmitting] = useState(false);
   const [athleteIds, setAthleteIds] = useState<number[]>([]);
   const [trainerIds, setTrainerIds] = useState<number[]>([]);
@@ -68,12 +71,13 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
 
   useEffect(() => {
     setStep(0);
+    setStartDate(initialDate); setEndDate(initialDate);
     if (!isOpen) {
       setName(''); setDescription(''); setSeason(''); setPhase('base_endurance');
       setCompetitionId(''); setSelectedTaxonomyNode(null); setAthleteIds([]); setTrainerIds([]); setSessions([]); setEditingSession(null);
       setStartDate(initialDate); setEndDate(initialDate);
     }
-  }, [isOpen]);
+  }, [isOpen, initialDate]);
 
   const expandedSessions = useMemo(() => sessions.flatMap(expandRecurringSession), [sessions]);
   const plannedSessions = useMemo(() => expandedSessions.map((session) => ({
@@ -138,11 +142,11 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   const fieldClass = 'w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-xs text-white outline-none focus:ring-2 focus:ring-amber-500';
 
   const modal = (
-    <EditorDialog title="Create squad training block" onClose={onClose} busy={submitting} dirty={Boolean(name || description || season || competitionId || selectedTaxonomyNode || athleteIds.length || trainerIds.length || sessions.length || editingSession || phase !== 'base_endurance' || startDate !== initialDate || endDate !== initialDate)} className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-3xl outline-none">
+    <EditorDialog title="Create squad training block" onClose={onClose} busy={submitting} dirty={Boolean(name || description || season || competitionId || selectedTaxonomyNode || athleteIds.length || trainerIds.length || sessions.length || editingSession || phase !== 'base_endurance' || startDate !== initialDate || endDate !== initialDate)} className="w-full max-w-5xl rounded-3xl outline-none">
       <div
         ref={dialogRef}
         aria-labelledby="create-schedule-title"
-        className="mx-auto grid h-[100dvh] w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border-slate-800 bg-slate-900 text-slate-100 shadow-2xl sm:my-[4dvh] sm:h-[92dvh] sm:max-h-[900px] sm:max-w-5xl sm:rounded-3xl sm:border"
+        className="mx-auto grid h-[min(var(--dialog-available-height),900px)] min-h-0 min-w-0 w-full grid-rows-[auto_minmax(4rem,1fr)_auto] rounded-3xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl [&_input]:min-w-0 [&_select]:min-w-0"
       >
         <header className="border-b border-slate-800 bg-slate-900/95 px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between gap-3">
@@ -156,7 +160,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
             <button type="button" data-editor-dismiss onClick={onClose} disabled={submitting} autoFocus className="shrink-0 rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50" aria-label="Close schedule builder"><X className="h-5 w-5" /></button>
           </div>
 
-          <nav className="mt-3 flex gap-1 overflow-x-auto pb-1 sm:mt-4 sm:grid sm:grid-cols-4" aria-label="Schedule creation steps">
+          <nav className="mt-3 grid grid-cols-2 gap-1 sm:mt-4 sm:grid-cols-4" aria-label="Schedule creation steps">
             {STEPS.map((item, index) => (
               <button
                 key={item.label}
@@ -164,7 +168,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                 onClick={() => index <= step && setStep(index)}
                 disabled={index > step}
                 aria-current={step === index ? 'step' : undefined}
-                className={`flex min-w-[112px] items-center gap-2 rounded-xl px-3 py-2 text-left text-[11px] font-bold transition-colors sm:min-w-0 ${
+                className={`flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-left text-[11px] font-bold transition-colors sm:min-w-0 ${
                   step === index ? 'bg-amber-500 text-slate-950' :
                   index < step ? 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20' :
                   'bg-slate-800/70 text-slate-500'
@@ -205,7 +209,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                       <option value="taper_recovery">Taper & Regatta Recovery</option>
                     </select>
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label className="text-xs font-semibold text-slate-300">Start date<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={`${fieldClass} mt-1 px-2`} required /></label>
                     <label className="text-xs font-semibold text-slate-300">End date<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={`${fieldClass} mt-1 px-2`} required /></label>
                   </div>
@@ -272,7 +276,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                             <div className="flex items-center gap-2"><Users className="h-3.5 w-3.5" />{athleteIds.length} athletes · {trainer ? trainer.full_name : `${trainerIds.length} schedule trainers`}</div>
                           </div>
                           {exercise && <div className="mt-3 rounded-xl bg-slate-900 p-3 text-[11px] text-slate-300">{exercise.name}{prescribedExercises.length > 1 ? ` + ${prescribedExercises.length - 1} more` : ''}{!prescribedExercises.length && session.target_reps_or_distance ? ` · ${session.target_reps_or_distance}` : ''}</div>}
-                          <div className="mt-4 flex justify-end gap-2 border-t border-slate-800 pt-3">
+                          <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-3">
                             <button type="button" onClick={() => setSessions((current) => [...current, { ...session, client_id: `session-${Date.now()}-${Math.random().toString(36).slice(2)}`, title: `${session.title} copy`, exercises: session.exercises?.map((item) => ({ ...item, client_id: `exercise-${Date.now()}-${Math.random().toString(36).slice(2)}` })) }])} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold text-emerald-300 hover:bg-emerald-500/10"><Copy className="h-3.5 w-3.5" />Duplicate</button>
                             <button type="button" onClick={() => setEditingSession({ ...session })} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold text-sky-300 hover:bg-sky-500/10"><Pencil className="h-3.5 w-3.5" />Edit</button>
                             <button type="button" onClick={() => { setSessions((current) => current.filter((item) => item.client_id !== session.client_id)); if (editingSession?.client_id === session.client_id) setEditingSession(null); }} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold text-rose-300 hover:bg-rose-500/10"><Trash2 className="h-3.5 w-3.5" />Remove</button>
@@ -296,7 +300,7 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                   </article>
                   <article className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-sky-300">Recipients</h4>
-                    <div className="mt-3 flex gap-3"><span className="rounded-xl bg-sky-500/10 px-3 py-2 text-xs font-bold text-sky-300">{selectedAthletes.length} athletes</span><span className="rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300">{selectedTrainers.length} trainers</span></div>
+                    <div className="mt-3 flex flex-wrap gap-3"><span className="rounded-xl bg-sky-500/10 px-3 py-2 text-xs font-bold text-sky-300">{selectedAthletes.length} athletes</span><span className="rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300">{selectedTrainers.length} trainers</span></div>
                     <div className="mt-3 flex flex-wrap gap-1.5">{[...selectedAthletes, ...selectedTrainers].slice(0, 8).map((member) => <span key={member.id} className="rounded-lg bg-slate-800 px-2 py-1 text-[10px] text-slate-300">{member.full_name}</span>)}{selectedAthletes.length + selectedTrainers.length > 8 && <span className="px-2 py-1 text-[10px] text-slate-500">+{selectedAthletes.length + selectedTrainers.length - 8} more</span>}</div>
                   </article>
                 </div>
@@ -309,10 +313,10 @@ export const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
           </div>
         </main>
 
-        <footer className="flex items-center justify-between gap-3 border-t border-slate-800 bg-slate-900/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 bg-slate-900/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
           <button type="button" data-editor-dismiss onClick={onClose} disabled={submitting} className="hidden px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white disabled:opacity-50 sm:block">Cancel</button>
           <span className="text-[11px] font-semibold text-slate-500 sm:hidden">{step + 1} / {STEPS.length}</span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {step > 0 && <button type="button" onClick={() => setStep((current) => current - 1)} disabled={submitting} className="flex items-center gap-1.5 rounded-xl border border-slate-700 px-3.5 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 disabled:opacity-50"><ArrowLeft className="h-4 w-4" />Back</button>}
             {step < STEPS.length - 1 ? (
               <button type="button" onClick={goNext} className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400">Continue<ArrowRight className="h-4 w-4" /></button>

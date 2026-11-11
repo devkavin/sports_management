@@ -77,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth, onJoinClub }) => {
 
               {showTourMenu && (
                 <div 
-                  className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700/80 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150"
+                  className="app-popover absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700/80 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150"
                   onClick={() => setShowTourMenu(false)}
                 >
                   <div className="px-3 py-2 border-b border-slate-800">
@@ -154,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth, onJoinClub }) => {
 
                 {showUserMenu && (
                   <div 
-                    className="absolute right-0 mt-2 w-52 bg-slate-900 border border-slate-700/90 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150"
+                    className="app-popover absolute right-0 mt-2 w-52 bg-slate-900 border border-slate-700/90 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150"
                     onClick={() => setShowUserMenu(false)}
                   >
                     <div className="px-3 py-2 border-b border-slate-800">
