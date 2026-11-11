@@ -5,3 +5,4 @@ from app.models.models import (
     ClubJoinRequest, ClubInvitation,
     UserAvailability, AvailabilityStatus
 )
+from app.models.periodization import PeriodizationPlan

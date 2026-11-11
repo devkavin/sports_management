@@ -27,6 +27,7 @@ from app.api.membership import router as membership_router
 from app.api.operations import router as operations_router
 from app.api.account import router as account_router
 from app.api.standards import router as standards_router
+from app.api.periodization import router as periodization_router
 from app.core.migrations import run_migrations
 from app.services.delivery import delivery_loop
 from sqlalchemy import text
@@ -89,6 +90,7 @@ app.include_router(membership_router, prefix=settings.API_V1_STR)
 app.include_router(operations_router, prefix=settings.API_V1_STR)
 app.include_router(account_router, prefix=settings.API_V1_STR)
 app.include_router(standards_router, prefix=settings.API_V1_STR)
+app.include_router(periodization_router, prefix=settings.API_V1_STR)
 
 @app.get("/health/ready")
 def ready():

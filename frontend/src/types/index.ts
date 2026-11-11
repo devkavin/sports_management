@@ -106,6 +106,8 @@ export interface Competition {
   end_date: string;
   target_distance_m: number;
   notes?: string;
+  periodization_plan_id?: number | null;
+  periodization_plan_name?: string | null;
   created_at: string;
 }
 

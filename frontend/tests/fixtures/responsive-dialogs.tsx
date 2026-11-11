@@ -10,6 +10,7 @@ import { LogPerformanceModal } from '../../src/components/performance/LogPerform
 import { CreateScheduleModal } from '../../src/components/schedule/CreateScheduleModal';
 import { ScheduleSessionModal } from '../../src/components/schedule/ScheduleSessionModal';
 import { StandardEditor } from '../../src/components/coach/PerformanceStandards';
+import { CompetitionEditor } from '../../src/components/coach/CompetitionEditor';
 import type { Exercise, Schedule, TrainingSession } from '../../src/types';
 
 window.fetch = async () => { throw new Error('Layout fixture: network requests disabled'); };
@@ -19,6 +20,7 @@ const schedule = { id: 1, name: 'Layout fixture', start_date: '2027-01-01T00:00:
 const frame = new URLSearchParams(location.search).get('frame');
 function Example() {
   const noop = () => {};
+  if (frame === 'regatta') return <CompetitionEditor schedules={[]} onClose={noop} onSaved={noop} />;
   if (frame === 'performance') return <LogPerformanceModal isOpen exercises={[exercise]} initialSession={session} onClose={noop} onSuccess={noop} />;
   if (frame === 'schedule') return <CreateScheduleModal isOpen exercises={[exercise]} competitions={[]} members={[]} onClose={noop} onSuccess={noop} />;
   if (frame === 'session') return <ScheduleSessionModal schedule={schedule} exercises={[exercise]} onClose={noop} onSuccess={noop} />;
@@ -27,6 +29,6 @@ function Example() {
 }
 function Gallery() {
   const [scenario, setScenario] = useState('performance');
-  return <main className="space-y-4 p-4"><h1 className="text-xl font-bold">Dialog layout QA — backend disabled</h1><label>Fixture <select className={inputClass} value={scenario} onChange={event => { setScenario(event.target.value); }}>{['performance', 'form', 'schedule', 'session', 'standard'].map(value => <option key={value}>{value}</option>)}</select></label><div className="flex flex-wrap items-start gap-6">{[[320, 568], [568, 320], [375, 667], [1024, 600]].map(([width, height]) => <section key={`${width}×${height}`}><h2>{width}×{height}</h2><iframe title={`${width}×${height} ${scenario}`} src={`?frame=${scenario}`} width={width} height={height} className="mt-2 border border-slate-600" /></section>)}</div></main>;
+  return <main className="space-y-4 p-4"><h1 className="text-xl font-bold">Dialog layout QA — backend disabled</h1><label>Fixture <select className={inputClass} value={scenario} onChange={event => { setScenario(event.target.value); }}>{['performance', 'form', 'schedule', 'session', 'standard', 'regatta'].map(value => <option key={value}>{value}</option>)}</select></label><div className="flex flex-wrap items-start gap-6">{[[320, 568], [568, 320], [375, 667], [1024, 600]].map(([width, height]) => <section key={`${width}×${height}`}><h2>{width}×{height}</h2><iframe title={`${width}×${height} ${scenario}`} src={`?frame=${scenario}`} width={width} height={height} className="mt-2 border border-slate-600" /></section>)}</div></main>;
 }
 createRoot(document.getElementById('root')!).render(frame ? <FeedbackProvider><AuthProvider><NavigationProvider><Example /></NavigationProvider></AuthProvider></FeedbackProvider> : <Gallery />);

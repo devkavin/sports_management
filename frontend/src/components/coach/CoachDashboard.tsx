@@ -16,6 +16,9 @@ import { PerformanceStandards } from './PerformanceStandards';
 import { CoachGraphicalAnalytics } from './CoachGraphicalAnalytics';
 import { BoathouseWeatherWidget } from '../weather/BoathouseWeatherWidget';
 import { TaxonomyTreeManager } from '../taxonomy/TaxonomyTreeManager';
+import { PeriodizationPlanner } from '../periodization/PeriodizationPlanner';
+import { CompetitionEditor } from './CompetitionEditor';
+import { regattaDateText } from '../../lib/regatta';
 import { EquipmentManager, ExerciseManager } from '../catalog/CatalogManagers';
 import { MembersManager } from '../admin/MembersManager';
 import { MembershipManager } from '../membership/MembershipManager';
@@ -54,14 +57,9 @@ export const CoachDashboard: React.FC = () => {
   const [sessionModal, setSessionModal] = useState<{ schedule: Schedule; session?: TrainingSession; duplicate?: boolean } | null>(null);
 
   // New Competition Form State
-  const [competitionSaving, setCompetitionSaving] = useState(false);
   const [benchmarkSaving, setBenchmarkSaving] = useState(false);
   const [showCompModal, setShowCompModal] = useState(false);
-  const [compName, setCompName] = useState('');
-  const [compLocation, setCompLocation] = useState('');
-  const [compDist, setCompDist] = useState<number | ''>('');
-  const [compStartDate, setCompStartDate] = useState('');
-  const [compEndDate, setCompEndDate] = useState('');
+  const [editingCompetition, setEditingCompetition] = useState<Competition | null>(null);
 
   // Team Announcement Broadcast State
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
@@ -106,26 +104,6 @@ export const CoachDashboard: React.FC = () => {
     loadData();
   }, [analyticsDays]);
 
-  const handleCreateCompetition = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (competitionSaving) return;
-    setCompetitionSaving(true);
-    try {
-      await api.createCompetition({
-        name: compName,
-        location: compLocation,
-        target_distance_m: Number(compDist),
-        start_date: new Date(compStartDate).toISOString(),
-        end_date: new Date(compEndDate).toISOString(),
-      });
-      setShowCompModal(false);
-      setCompName('');
-      setCompLocation(''); setCompDist(''); setCompStartDate(''); setCompEndDate('');
-      loadData();
-    } catch (err: any) {
-      notify(`Error creating competition: ${err.message}`);
-    } finally { setCompetitionSaving(false); }
-  };
 
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -406,7 +384,7 @@ export const CoachDashboard: React.FC = () => {
               </p>
             </div>
             <button
-              onClick={() => setShowCompModal(true)}
+              onClick={() => { setEditingCompetition(null); setShowCompModal(true); }}
               className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md flex items-center gap-1.5"
             >
               <PlusCircle className="w-4 h-4" /> Add Competition
@@ -438,13 +416,15 @@ export const CoachDashboard: React.FC = () => {
 
                 <div className="text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
                   <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span>Regatta Window:</span>
+                    <span>Regatta date:</span>
                     <span className="font-mono text-white">
-                      {new Date(c.start_date).toLocaleDateString()} - {new Date(c.end_date).toLocaleDateString()}
+                      {regattaDateText(c.start_date)}{c.end_date.slice(0, 10) !== c.start_date.slice(0, 10) ? ' – ' + regattaDateText(c.end_date) : ''}
                     </span>
                   </div>
                   {c.notes && <p className="text-slate-400 text-[11px] mt-1">{c.notes}</p>}
+                  <p className="mt-2 text-xs text-sky-200">Periodization plan: {c.periodization_plan_name || 'Not linked'}</p>
                 </div>
+                <div className="flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800" onClick={() => { setEditingCompetition(c); setShowCompModal(true); }}>Edit regatta / plan link</button>{c.periodization_plan_id && <button type="button" className="rounded-lg bg-sky-500/15 px-3 py-2 text-xs font-semibold text-sky-200" onClick={() => navigate('taxonomy')}>Open periodization planner</button>}</div>
               </div>
             ))}
           </div>
@@ -574,6 +554,7 @@ export const CoachDashboard: React.FC = () => {
       {/* TAB 5: Periodization & Unlimited-Depth Taxonomy Manager */}
       {activeTab === 'taxonomy' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+          <PeriodizationPlanner schedules={schedules} />
           <TaxonomyTreeManager userRole="coach" onTreeChanged={loadData} />
         </div>
       )}
@@ -605,71 +586,7 @@ export const CoachDashboard: React.FC = () => {
         onSuccess={() => loadData()}
       />
 
-      {/* Create Competition Modal */}
-      {showCompModal && (
-        <EditorDialog title="Add competition" onClose={() => setShowCompModal(false)} busy={competitionSaving} className="w-full max-w-md rounded-3xl outline-none">
-          <div className="min-w-0 w-full bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl [&_input]:min-w-0 [&_select]:min-w-0 space-y-4">
-            <h3 className="text-lg font-bold text-white">Add Target Regatta / Competition</h3>
-            <form onSubmit={handleCreateCompetition} className="space-y-3">
-              <input
-                type="text"
-                placeholder="Competition name"
-                value={compName}
-                onChange={(e) => setCompName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Regatta Location / Course"
-                value={compLocation}
-                onChange={(e) => setCompLocation(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white"
-              />
-              <input
-                type="number"
-                placeholder="Target Distance (meters, e.g. 2000)"
-                value={compDist}
-                onChange={(e) => setCompDist(e.target.value ? Number(e.target.value) : '')}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white"
-                required
-              />
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <input
-                  type="date"
-                  value={compStartDate}
-                  onChange={(e) => setCompStartDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                  required
-                />
-                <input
-                  type="date"
-                  value={compEndDate}
-                  onChange={(e) => setCompEndDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                  required
-                />
-              </div>
-              <div className="flex flex-wrap justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  data-editor-dismiss onClick={() => setShowCompModal(false)}
-                  className="px-3 py-1.5 text-xs text-slate-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={competitionSaving}
-                  className="px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs"
-                >
-                  {competitionSaving ? 'Saving…' : 'Save Regatta'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </EditorDialog>
-      )}
+      {showCompModal && <CompetitionEditor competition={editingCompetition} schedules={schedules} onClose={() => { setShowCompModal(false); setEditingCompetition(null); }} onSaved={() => { void loadData(); }} />}
 
       {/* Broadcast Announcement Modal */}
       {showBroadcastModal && (

@@ -206,10 +206,16 @@ class Competition(Base):
     end_date = Column(DateTime, nullable=False)
     target_distance_m = Column(Integer, nullable=False)
     notes = Column(Text, nullable=True)
+    periodization_plan_id = Column(Integer, ForeignKey("periodization_plans.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     club = relationship("Club", back_populates="competitions")
     schedules = relationship("Schedule", back_populates="competition")
+    periodization_plan = relationship("PeriodizationPlan", back_populates="competitions")
+
+    @property
+    def periodization_plan_name(self):
+        return self.periodization_plan.name if self.periodization_plan else None
 
 class Equipment(Base):
     __tablename__ = "equipment"

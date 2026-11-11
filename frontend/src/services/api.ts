@@ -7,6 +7,7 @@ import {
 } from '../types';
 import { requestFailureMessage } from '../lib/formUx';
 import type { PerformanceStandard, StandardInput, StandardEvaluation } from '../types/standards';
+import type { PeriodizationPlan, PeriodizationPlanInput } from '../types/periodization';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -137,6 +138,11 @@ class ApiService {
   }
 
   // Club & Members
+  async getPeriodizationPlans(): Promise<PeriodizationPlan[]> { return this.request('/periodization-plans'); }
+  async createPeriodizationPlan(data: PeriodizationPlanInput): Promise<PeriodizationPlan> { return this.request('/periodization-plans', { method: 'POST', body: JSON.stringify(data) }); }
+  async updatePeriodizationPlan(id: number, data: PeriodizationPlanInput & { version: number }): Promise<PeriodizationPlan> { return this.request(`/periodization-plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
+  async archivePeriodizationPlan(id: number, archived: boolean, version: number): Promise<PeriodizationPlan> { return this.request(`/periodization-plans/${id}/archive`, { method: 'POST', body: JSON.stringify({ archived, version }) }); }
+  async updateCompetition(id: number, data: Partial<Competition>): Promise<Competition> { return this.request(`/competitions/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
   async getStandards(): Promise<PerformanceStandard[]> { return this.request('/standards'); }
   async createStandard(data: StandardInput): Promise<PerformanceStandard> { return this.request('/standards', { method: 'POST', body: JSON.stringify(data) }); }
   async updateStandard(id: number, data: StandardInput & { version: number }): Promise<PerformanceStandard> { return this.request(`/standards/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }

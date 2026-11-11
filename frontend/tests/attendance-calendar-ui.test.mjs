@@ -17,7 +17,7 @@ function load(relative) {
   const module = { exports: {} };
   cache.set(path, module.exports);
   const output = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: {
-    jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
+    jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
   } }).outputText;
   const localRequire = name => {
     if (name.endsWith('/AuthContext')) return { useAuth: () => ({ user: { id: 1, role } }) };
@@ -72,6 +72,26 @@ test('standard editor keeps deactivated audience selections visible for removal'
   }));
   assert.match(html, /Inactive athlete/);
   assert.match(html, /value="420.04"/);
+});
+
+test('regatta creation labels the race date and offers reusable plan creation', () => {
+  const { CompetitionEditor } = load('../src/components/coach/CompetitionEditor.tsx');
+  const html = renderToStaticMarkup(React.createElement(CompetitionEditor, { schedules: [], onClose() {}, onSaved() {} }));
+  assert.match(html, /Regatta date \(date of the competition\)/);
+  assert.match(html, /This competition spans multiple days/);
+  assert.match(html, /Periodization plan/);
+  assert.match(html, /Create plan/);
+  assert.doesNotMatch(html, /Competition end date/);
+});
+
+test('editing a multi-day regatta retains its explicit race date and end date', () => {
+  const { CompetitionEditor } = load('../src/components/coach/CompetitionEditor.tsx');
+  const html = renderToStaticMarkup(React.createElement(CompetitionEditor, { schedules: [],
+    competition: { id: 5, name: 'Race', competition_type: 'sprint_regatta', target_distance_m: 2000, start_date: '2027-02-11T00:00:00', end_date: '2027-02-13T00:00:00' }, onClose() {}, onSaved() {},
+  }));
+  assert.match(html, /Competition end date/);
+  assert.match(html, /value="2027-02-11"/);
+  assert.match(html, /value="2027-02-13"/);
 });
 
 test('calendar exposes dates as keyboard accessible buttons with session counts and real titles', () => {

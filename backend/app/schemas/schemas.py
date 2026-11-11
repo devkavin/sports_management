@@ -156,13 +156,34 @@ class ClubInvitationAccept(BaseModel):
 
 # Competition Schemas
 class CompetitionCreate(BaseModel):
-    name: str
+    model_config = ConfigDict(str_strip_whitespace=True)
+    name: str = Field(min_length=1, max_length=255)
     location: Optional[str] = None
     competition_type: Optional[str] = "sprint_regatta"
     start_date: datetime
-    end_date: datetime
-    target_distance_m: int = Field(gt=0)
+    end_date: Optional[datetime] = None
+    target_distance_m: int = Field(gt=0, le=2147483647)
     notes: Optional[str] = None
+    periodization_plan_id: Optional[int] = Field(default=None, gt=0, strict=True)
+
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def utc_midnight(cls, value):
+        if value is None:
+            return None
+        if value.tzinfo:
+            value = value.astimezone(timezone.utc)
+        if value.year < 1000:
+            raise ValueError("Regatta dates must be in year 1000 or later")
+        return value.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+
+    @model_validator(mode="after")
+    def valid_dates(self):
+        if self.end_date is None:
+            self.end_date = self.start_date
+        if self.end_date < self.start_date:
+            raise ValueError("Regatta end must be on or after start")
+        return self
 
 class CompetitionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -176,6 +197,8 @@ class CompetitionOut(BaseModel):
     end_date: datetime
     target_distance_m: int
     notes: Optional[str] = None
+    periodization_plan_id: Optional[int] = None
+    periodization_plan_name: Optional[str] = None
     created_at: datetime
 
 # Equipment Schemas

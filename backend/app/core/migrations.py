@@ -8,6 +8,7 @@ from app.core.database import Base, engine, run_additive_migrations
 from app.models import models  # noqa: F401
 from app.models import operations  # noqa: F401
 from app.models.standards import PerformanceStandard
+from app.models.periodization import PeriodizationPlan
 
 
 def _baseline():
@@ -48,7 +49,22 @@ def _performance_standards():
     PerformanceStandard.__table__.create(bind=engine, checkfirst=True)
 
 
-MIGRATIONS = [("0001_baseline", _baseline), ("0002_club_workflows", _workflows), ("0003_reservation_snapshots", _reservation_snapshots), ("0004_performance_standards", _performance_standards)]
+def _regatta_periodization():
+    PeriodizationPlan.__table__.create(bind=engine, checkfirst=True)
+    with engine.connect() as connection:
+        inspector = inspect(connection)
+        columns = {column["name"] for column in inspector.get_columns("competitions")}
+        if "periodization_plan_id" not in columns:
+            connection.execute(text("ALTER TABLE competitions ADD COLUMN periodization_plan_id INTEGER NULL"))
+            connection.commit()
+        foreign_keys = inspect(connection).get_foreign_keys("competitions")
+        if not any(fk["constrained_columns"] == ["periodization_plan_id"] and
+                   fk["referred_table"] == "periodization_plans" for fk in foreign_keys):
+            connection.execute(text("ALTER TABLE competitions ADD CONSTRAINT fk_competitions_periodization_plan FOREIGN KEY (periodization_plan_id) REFERENCES periodization_plans (id)"))
+            connection.commit()
+
+
+MIGRATIONS = [("0001_baseline", _baseline), ("0002_club_workflows", _workflows), ("0003_reservation_snapshots", _reservation_snapshots), ("0004_performance_standards", _performance_standards), ("0005_regatta_periodization", _regatta_periodization)]
 
 
 def run_migrations():

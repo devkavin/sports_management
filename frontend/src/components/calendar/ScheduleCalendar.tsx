@@ -89,8 +89,8 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   // Helper to get competitions on a specific date
   const getCompetitionsForDate = (date: Date) => {
     return competitions.filter((c) => {
-      const sDate = new Date(c.start_date);
-      const eDate = new Date(c.end_date);
+      const sDate = new Date(c.start_date.slice(0, 10) + 'T00:00:00');
+      const eDate = new Date(c.end_date.slice(0, 10) + 'T00:00:00');
       return date >= new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate()) &&
              date <= new Date(eDate.getFullYear(), eDate.getMonth(), eDate.getDate());
     });
